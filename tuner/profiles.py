@@ -145,6 +145,34 @@ def write_profile(name: str, params: dict[str, Any],
             "revision": check["revision"], "path": str(doc_path)}
 
 
+def read_profiles() -> list[dict[str, Any]]:
+    """Read the profiles that already exist in mVolt+ (does not modify them)."""
+    try:
+        doc = json.loads(profile_document().read_text(encoding="utf-8"))
+    except (ProfileError, OSError, ValueError):
+        return []
+
+    out: list[dict[str, Any]] = []
+    for p in doc.get("profiles") or []:
+        c = p.get("controls") or {}
+        core, mem, nv = c.get("core") or {}, c.get("memory") or {}, c.get("nvvdd") or {}
+        params: dict[str, Any] = {}
+        if core.get("enabled"):
+            params["core"] = core.get("offset_mhz", 0)
+        if mem.get("enabled"):
+            params["mem"] = mem.get("offset_mhz", 0)
+        if nv.get("enabled"):
+            params["rel"] = int(nv.get("rel_offset_uv", 0)) // 1000
+        out.append({
+            "id": p.get("id"),
+            "name": p.get("name"),
+            "params": params,
+            "enabled_controls": [k for k, v in c.items()
+                                 if isinstance(v, dict) and v.get("enabled")],
+        })
+    return out
+
+
 def pick_configs(trials: list[dict[str, Any]], ceiling: int,
                  limit: int = 3) -> list[tuple[str, dict[str, Any], dict[str, Any]]]:
     """Choose up to `limit` recommended configs from journalled trials.

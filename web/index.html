@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -603,6 +603,7 @@ function paretoOf(pts){
    Measured once at session start: offsets 0, REL 0, boost lock off,
    power at default. Everything in the sweep is judged against this.     */
 let BASELINE = { score: 4310, watts: 62.0 };
+let PROFILES = [];   // declared early: drawPareto reads it on first paint
 
 /* ---------- app state ---------- */
 const state = {
@@ -744,6 +745,23 @@ function drawPareto(){
       tip.classList.add('on');
     });
     c.addEventListener('mouseleave', () => document.getElementById('tip1').classList.remove('on'));
+  }
+
+  // ---- existing mVolt+ profiles: ring markers where their config was measured
+  for (const prof of PROFILES){
+    const pr = prof.params || {};
+    const hit = scored.find(t =>
+      (t.core || 0) === (pr.core || 0) &&
+      (t.mem  || 0) === (pr.mem  || 0) &&
+      Math.abs((t.rel || 0) - (pr.rel || 0)) < 0.6);
+    if (!hit) continue;
+
+    const cx = X(hit.watts), cy = Y(hit.score);
+    el('circle', {cx, cy, r:9.5, fill:'none', stroke:'#fbbf24',
+                  'stroke-width':1.7, 'stroke-dasharray':'3 2.5', opacity:.95}, svg);
+    const lab = el('text', {x:cx+11, y:cy-8, fill:'#fbbf24', 'font-size':8.5,
+                            'font-family':'ui-monospace,monospace'}, svg);
+    lab.textContent = prof.name;
   }
 
   document.getElementById('frontTag').textContent = front.length + ' on front · ' + pts.length + ' trials';
@@ -1125,6 +1143,21 @@ async function loadLive(){
 }
 loadLive();
 setInterval(loadLive, 5000);
+
+/* ---------- existing mVolt+ profiles (read-only overlay) ---------- */
+async function loadProfiles(){
+  try {
+    const r = await fetch('/api/profiles', { cache: 'no-store' });
+    if (!r.ok) return;
+    const j = await r.json();
+    const next = j.profiles || [];
+    const changed = JSON.stringify(next) !== JSON.stringify(PROFILES);
+    PROFILES = next;
+    if (changed) drawPareto();
+  } catch (e) { /* API not running - no overlay */ }
+}
+loadProfiles();
+setInterval(loadProfiles, 10000);
 
 /* ---------- locked recommendation banner ---------- */
 async function loadVerdict(){

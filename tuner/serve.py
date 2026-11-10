@@ -70,6 +70,13 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as exc:
                 self._json(500, {"error": str(exc)})
             return
+        if route == "/api/profiles":
+            try:
+                self._json(200, {"app_running": profiles.app_running(),
+                                 "profiles": profiles.read_profiles()})
+            except Exception as exc:
+                self._json(500, {"error": str(exc)})
+            return
         if route in ("/", "/index.html"):
             self.send_response(302)
             self.send_header("Location", "/web/index.html")
