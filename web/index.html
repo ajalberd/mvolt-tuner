@@ -1,0 +1,1193 @@
+﻿<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mVolt Tuner</title>
+<link rel="icon" href="data:," />
+<style>
+  :root{
+    --bg:#0a0e14; --bg2:#0f151d; --panel:#111925; --panel2:#151f2e;
+    --line:#1e2b3d; --line2:#27384e;
+    --tx:#dbe6f3; --tx2:#8fa3bb; --tx3:#5c7089;
+    --cy:#38bdf8; --cy2:#0ea5e9;
+    --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --vio:#a78bfa;
+    --mono: ui-monospace,"SF Mono","Cascadia Mono","Consolas",monospace;
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:
+      radial-gradient(1200px 600px at 15% -10%, #12203a 0%, transparent 55%),
+      radial-gradient(900px 500px at 95% 0%, #0d2430 0%, transparent 50%),
+      var(--bg);
+    color:var(--tx);
+    font:13px/1.45 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;
+    -webkit-font-smoothing:antialiased; overflow:hidden;
+  }
+  @media (prefers-reduced-motion: reduce){ *{transition:none !important} }
+
+  /* ---------- top bar ---------- */
+  .topbar{
+    display:flex; align-items:center; gap:16px; padding:10px 16px;
+    border-bottom:1px solid var(--line); background:rgba(10,14,20,.82);
+    backdrop-filter:blur(8px);
+  }
+  .brand{display:flex; align-items:center; gap:10px; font-weight:650; letter-spacing:.2px}
+  .logo{width:22px;height:22px;border-radius:6px;background:linear-gradient(140deg,var(--cy),#6366f1);
+        box-shadow:0 0 18px -4px var(--cy); display:grid;place-items:center;font-size:11px;color:#03121c;font-weight:800}
+  .gpu{display:flex; align-items:baseline; gap:8px; color:var(--tx2); font-size:12px; padding-left:14px; border-left:1px solid var(--line)}
+  .gpu b{color:var(--tx); font-weight:600}
+  .spacer{flex:1}
+  .badge{font-size:10px;letter-spacing:.09em;text-transform:uppercase;padding:3px 8px;border-radius:999px;
+         border:1px solid var(--line2); color:var(--tx2); font-weight:600}
+  .badge.mock{border-color:#7c5cff55;color:#c4b5fd;background:#7c5cff14}
+  .state{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;padding:5px 11px;border-radius:8px;
+         border:1px solid var(--line2); background:var(--panel)}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--tx3)}
+  .state.run .dot{background:var(--ok); box-shadow:0 0 10px var(--ok); animation:pulse 1.6s infinite}
+  .state.soak .dot{background:var(--cy); box-shadow:0 0 10px var(--cy); animation:pulse 1.2s infinite}
+  .state.crash .dot{background:var(--bad); box-shadow:0 0 10px var(--bad)}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+
+  /* ---------- telemetry strip ---------- */
+  .telem{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);
+         border-bottom:1px solid var(--line)}
+  .tcell{background:var(--bg2);padding:9px 14px 8px;position:relative;overflow:hidden}
+  .tlabel{font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--tx3);font-weight:600}
+  .tval{font-family:var(--mono);font-size:21px;font-weight:600;letter-spacing:-.4px;line-height:1.15}
+  .tval small{font-size:11px;color:var(--tx3);font-weight:500;margin-left:3px}
+  .tspark{position:absolute;right:0;bottom:0;width:110px;height:30px;opacity:.5;pointer-events:none}
+  .t-bar{height:2px;background:var(--line);margin-top:5px;border-radius:2px;overflow:hidden}
+  .t-bar i{display:block;height:100%;background:var(--cy);transition:width .4s ease,background .4s}
+
+  /* ---------- shell ---------- */
+  .shell{display:grid;grid-template-columns:336px 1fr;height:calc(100vh - 49px - 60px - 30px)}
+  .side{border-right:1px solid var(--line);overflow:hidden;padding:12px;display:flex;flex-direction:column;gap:10px;
+        background:linear-gradient(180deg,#0c1219,#0a0e14)}
+  .main{overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:10px}
+  .knobs-card{display:flex;flex-direction:column;min-height:0;flex:1}
+  .knobscroll{overflow-y:auto;padding:10px 12px;flex:1;min-height:0}
+  .knobscroll::-webkit-scrollbar{width:9px}
+  .knobscroll::-webkit-scrollbar-thumb{background:#1d2a3c;border-radius:9px;border:2px solid transparent;background-clip:padding-box}
+  .bottomrow{display:grid;grid-template-columns:1fr 1fr 1.15fr;gap:10px}
+  .picks{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .pick-save{margin-top:9px;width:100%;padding:7px 10px;border-radius:7px;cursor:pointer;
+    background:#12303f;color:#a5f3fc;border:1px solid #1e4a5f;font-size:11.5px;font-weight:600;
+    font-family:inherit;transition:background .12s,border-color .12s}
+  .pick-save:hover{background:#17414f;border-color:#2b6b80}
+  .pick-save:disabled{opacity:.55;cursor:default}
+  .pick-msg{margin-top:6px;font-size:10.5px;color:var(--tx3);min-height:13px;line-height:1.4}
+  .pick-msg.ok{color:var(--ok)}
+  .pick-msg.err{color:#fca5a5}
+  .verdict{display:flex;align-items:center;gap:13px;padding:10px 14px;border-radius:10px;
+    background:linear-gradient(90deg,#0b2f25,#0d2436);border:1px solid #155e46;font-size:12.5px}
+  .verdict .v-label{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:#6ee7b7;font-weight:700}
+  .verdict .v-title{font-family:var(--mono);font-weight:700;color:#d1fae5;font-size:14px}
+  .verdict .v-gain{font-family:var(--mono);color:var(--ok);font-weight:700;font-size:13px;
+    padding:2px 8px;border-radius:5px;background:#0d3a2d;border:1px solid #155e46}
+  .verdict .v-note{color:var(--tx3);font-size:10.5px;margin-left:auto;text-align:right;line-height:1.45}
+  .pick{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px;position:relative;overflow:hidden}
+  .pick::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--line2)}
+  .pick.p1::before{background:var(--cy)}
+  .pick.p2::before{background:var(--ok)}
+  .pick.p3::before{background:var(--vio)}
+  .pick-h{display:flex;align-items:center;gap:7px;font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+          color:var(--tx3);font-weight:650;margin-bottom:7px}
+  .pick-rank{width:15px;height:15px;border-radius:4px;display:grid;place-items:center;font-size:9px;
+             background:#16202e;border:1px solid var(--line2);color:var(--tx2)}
+  .pick-score{font-family:var(--mono);font-size:23px;font-weight:600;letter-spacing:-.5px;line-height:1.1}
+  .pick-score small{font-size:10px;color:var(--tx3);font-weight:500;margin-left:3px}
+  .pick-meta{font-family:var(--mono);font-size:10px;color:var(--tx3);margin-top:4px;line-height:1.5}
+  .pick-deltas{display:flex;gap:6px;margin-top:7px;flex-wrap:wrap}
+  .d{font-family:var(--mono);font-size:9.5px;padding:1px 6px;border-radius:4px;font-weight:600}
+  .d.up{background:#0d3a2d;color:var(--ok);border:1px solid #155e46}
+  .d.down{background:#3a1218;color:var(--bad);border:1px solid #5f1f2a}
+  .d.flat{background:#16202e;color:var(--tx3);border:1px solid var(--line2)}
+  .pick.empty .pick-score{color:var(--tx3)}
+  .pick-note{font-size:9.5px;color:var(--tx3);margin-top:5px}
+  .card-b.tight{padding:6px 12px}
+  .unavail{border:1px dashed #1b2839;border-radius:8px;padding:6px 9px;margin-top:4px}
+  .urow{display:flex;justify-content:space-between;font-size:11px;color:var(--tx3);padding:3px 0}
+  .urow span:last-child{font-family:var(--mono);font-size:10px}
+  .side::-webkit-scrollbar,.main::-webkit-scrollbar,.tblwrap::-webkit-scrollbar{width:9px;height:9px}
+  .side::-webkit-scrollbar-thumb,.main::-webkit-scrollbar-thumb,.tblwrap::-webkit-scrollbar-thumb{
+    background:#1d2a3c;border-radius:9px;border:2px solid transparent;background-clip:padding-box}
+
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .card-h{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--line);
+          font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--tx2);font-weight:650}
+  .card-h .tag{margin-left:auto;font-size:10px;letter-spacing:0;text-transform:none;color:var(--tx3);font-weight:500}
+  .card-b{padding:10px 12px}
+
+  /* knobs */
+  .grp{font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--tx3);font-weight:650;
+       margin:2px 0 6px;display:flex;align-items:center;gap:7px}
+  .grp::after{content:"";flex:1;height:1px;background:var(--line)}
+  .knob{padding:7px 0}
+  .knob+.knob{border-top:1px dashed #182433}
+  .khead{display:flex;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:5px}
+  .kname{font-size:12px;color:var(--tx);font-weight:500}
+  .kval{font-family:var(--mono);font-size:12px;color:var(--cy);font-weight:600}
+  .kval.muted{color:var(--tx3)}
+  input[type=range]{-webkit-appearance:none;width:100%;height:3px;border-radius:3px;background:#1b2839;outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;border-radius:50%;
+    background:var(--cy); border:2px solid #062032; box-shadow:0 0 0 1px var(--cy); cursor:pointer}
+  input[type=range]:disabled{opacity:.35} input[type=range]:disabled::-webkit-slider-thumb{background:var(--tx3);box-shadow:none;border-color:#111}
+  .kfoot{display:flex;justify-content:space-between;font-family:var(--mono);font-size:9.5px;color:var(--tx3);margin-top:3px}
+  .chip{font-family:inherit;font-size:9px;letter-spacing:.05em;text-transform:uppercase;padding:1px 5px;border-radius:4px;
+        border:1px solid #1d4e63;color:#7dd3fc;background:#0e3644}
+  .chip.off{border-color:#2a3444;color:#54657a;background:#111a24}
+  .chips{display:flex;gap:3px;align-items:center}
+  .chip.prov-rec{border-color:#155e46;color:#6ee7b7;background:#0d3a2d}
+  .chip.prov-set{border-color:#5e4a13;color:#fcd34d;background:#3a2f0f}
+  .chip.prov-gui{border-color:#5f1f2a;color:#fca5a5;background:#3a1218}
+  .noncli{border:1px dashed #1b2839;border-radius:8px;padding:6px 9px;margin-top:4px}
+  .nrow{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;
+        color:var(--tx2);padding:3px 0}
+  .legend-row{display:flex;align-items:center;gap:7px;padding:3px 0;font-size:10.5px;color:var(--tx3)}
+  .legend-row b{color:var(--tx2);font-weight:600}
+  .knob.locked .kname{color:var(--tx3)}
+  .sw{display:flex;align-items:center;gap:8px}
+  .sw input{display:none}
+  .sw label{width:34px;height:18px;border-radius:999px;background:#1b2839;position:relative;cursor:pointer;transition:.2s;flex:none}
+  .sw label::after{content:"";position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;background:#5c7089;transition:.2s}
+  .sw input:checked+label{background:#0d4f6b}
+  .sw input:checked+label::after{left:18px;background:var(--cy);box-shadow:0 0 8px var(--cy)}
+
+  /* safety rows */
+  .row{display:flex;justify-content:space-between;gap:10px;padding:5px 0;font-size:11.5px;
+       border-bottom:1px dashed #16212f}
+  .row:last-child{border:0}
+  .row span:first-child{color:var(--tx2)}
+  .row span:last-child{font-family:var(--mono);color:var(--tx);font-weight:600}
+  .row span:last-child.warn{color:var(--warn)}
+  .row span:last-child.ok{color:var(--ok)}
+
+  /* buttons */
+  .btns{display:flex;gap:6px;padding:10px 12px;border-top:1px solid var(--line);background:var(--panel2)}
+  button{flex:1;padding:8px 6px;border-radius:7px;border:1px solid var(--line2);background:#16202e;color:var(--tx);
+         font-size:11.5px;font-weight:600;cursor:pointer;transition:.15s;font-family:inherit}
+  button:hover:not(:disabled){background:#1d2a3c;border-color:#33475f}
+  button:disabled{opacity:.4;cursor:not-allowed}
+  button.primary{background:linear-gradient(180deg,#0e7490,#0b5d75);border-color:#0e7490;color:#e0f7ff}
+  button.primary:hover:not(:disabled){background:linear-gradient(180deg,#0891b2,#0e7490)}
+  button.danger{border-color:#5b2430;color:#fca5a5;background:#241318}
+  button.danger:hover:not(:disabled){background:#33161d}
+
+  /* charts */
+  .charts{display:grid;grid-template-columns:1.55fr 1fr;gap:10px;min-height:300px}
+  .chartbox{position:relative;height:296px}
+  .chartbox svg{display:block;width:100%;height:100%}
+  .legend{display:flex;gap:14px;padding:7px 12px;border-top:1px solid var(--line);font-size:10.5px;color:var(--tx2);flex-wrap:wrap}
+  .legend i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .tip{position:absolute;pointer-events:none;background:#0a121c;border:1px solid var(--line2);border-radius:7px;
+       padding:7px 9px;font-size:11px;font-family:var(--mono);line-height:1.5;color:var(--tx);
+       box-shadow:0 8px 24px #000a;opacity:0;transition:opacity .12s;z-index:5;white-space:nowrap}
+  .tip.on{opacity:1}
+  .tip b{color:var(--cy)}
+
+  /* table */
+  .tblwrap{max-height:222px;overflow:auto}
+  table{width:100%;border-collapse:collapse;font-size:11.5px}
+  th{position:sticky;top:0;background:#0e1722;color:var(--tx3);font-size:9.5px;letter-spacing:.07em;
+     text-transform:uppercase;font-weight:650;text-align:right;padding:7px 10px;border-bottom:1px solid var(--line);z-index:1}
+  th:first-child,td:first-child{text-align:left}
+  th:nth-child(9),td:nth-child(9){text-align:center}
+  td{padding:6px 10px;text-align:right;border-bottom:1px solid #131d29;font-family:var(--mono);color:var(--tx)}
+  tr:hover td{background:#131f2c}
+  td.params{color:var(--tx2)}
+  .pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:9.5px;font-weight:700;letter-spacing:.04em;
+        font-family:inherit;text-transform:uppercase}
+  .pill.ok{background:#0d3a2d;color:var(--ok);border:1px solid #155e46}
+  .pill.ver{background:#0b3d4e;color:#7dd3fc;border:1px solid #0e5a72}
+  .pill.crash{background:#3a1218;color:var(--bad);border:1px solid #5f1f2a}
+  .pill.ns{background:#3a2f0f;color:var(--warn);border:1px solid #5e4a13}
+  .pill.soak{background:#2a1f3f;color:var(--vio);border:1px solid #453070}
+
+  /* footer */
+  .statusbar{height:30px;display:flex;align-items:center;gap:14px;padding:0 16px;border-top:1px solid var(--line);
+             background:#080c11;font-size:11px;color:var(--tx3);font-family:var(--mono)}
+  .statusbar b{color:var(--tx2);font-weight:600}
+  .statusbar .mocknote{color:#c4b5fd}
+  .prog{width:130px;height:4px;border-radius:3px;background:#152131;overflow:hidden}
+  .prog i{display:block;height:100%;background:linear-gradient(90deg,var(--cy),#6366f1);transition:width .4s}
+  .empty{color:var(--tx3);font-size:12px;text-align:center;padding:22px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand"><div class="logo">M</div> mVolt Tuner</div>
+  <div class="gpu">
+    <b>NVIDIA GeForce RTX 2060</b> · mobile · 6 GB
+    <span style="color:var(--tx3)">|</span> driver <b>610.88</b>
+    <span style="color:var(--tx3)">|</span> VBIOS <b>90.06.39.00.4b</b>
+  </div>
+  <div class="spacer"></div>
+  <div class="badge mock" id="srcBadge">connecting…</div>
+  <div class="badge" id="testBadge">glfurrymsi · 1920×1080</div>
+  <div class="state" id="statePill"><span class="dot"></span><span id="stateText">idle</span></div>
+</div>
+
+<div class="telem">
+  <div class="tcell">
+    <div class="tlabel">GPU temp</div>
+    <div class="tval" id="tTemp">—<small>°C</small></div>
+    <div class="t-bar"><i id="bTemp" style="width:0%"></i></div>
+    <svg class="tspark" id="sTemp" viewBox="0 0 110 30" preserveAspectRatio="none"></svg>
+  </div>
+  <div class="tcell">
+    <div class="tlabel">Board power</div>
+    <div class="tval" id="tPower">—<small>W</small></div>
+    <div class="t-bar"><i id="bPower" style="width:0%;background:var(--vio)"></i></div>
+    <svg class="tspark" id="sPower" viewBox="0 0 110 30" preserveAspectRatio="none"></svg>
+  </div>
+  <div class="tcell">
+    <div class="tlabel">Core clock</div>
+    <div class="tval" id="tCore">—<small>MHz</small></div>
+    <div class="t-bar"><i id="bCore" style="width:0%;background:var(--cy)"></i></div>
+    <svg class="tspark" id="sCore" viewBox="0 0 110 30" preserveAspectRatio="none"></svg>
+  </div>
+  <div class="tcell">
+    <div class="tlabel">Memory clock</div>
+    <div class="tval" id="tMem">—<small>MHz</small></div>
+    <div class="t-bar"><i id="bMem" style="width:0%;background:var(--ok)"></i></div>
+    <svg class="tspark" id="sMem" viewBox="0 0 110 30" preserveAspectRatio="none"></svg>
+  </div>
+  <div class="tcell">
+    <div class="tlabel">Limit reason</div>
+    <div class="tval" id="tLimit" style="font-size:15px">—</div>
+    <div class="t-bar"><i style="width:100%;background:var(--line2)"></i></div>
+    <svg class="tspark" id="sLimit" viewBox="0 0 110 30" preserveAspectRatio="none"></svg>
+  </div>
+</div>
+
+<div class="shell">
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="side">
+    <div class="card knobs-card">
+      <div class="card-h">Search space <span class="tag" id="dimTag">4 swept</span></div>
+      <div class="knobscroll" id="knobs"></div>
+      <div class="btns">
+        <button class="primary" id="btnStart">Start</button>
+        <button id="btnPause" disabled>Pause</button>
+        <button class="danger" id="btnAbort">Abort</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <main class="main">
+    <div class="verdict" id="verdict" style="display:none"></div>
+    <div class="charts">
+      <div class="card">
+        <div class="card-h">Pareto front — power vs score <span class="tag" id="frontTag">0 points</span></div>
+        <div class="chartbox" id="paretoBox">
+          <svg id="pareto"></svg>
+          <div class="tip" id="tip1"></div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--ok)"></i>stable</span>
+          <span><i style="background:#7dd3fc"></i>soak-verified</span>
+          <span style="margin-left:auto;color:var(--tx3)">a failed run has no score, so it cannot appear here</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Score over trials <span class="tag">best-so-far</span></div>
+        <div class="chartbox" id="progBox">
+          <svg id="prog"></svg>
+          <div class="tip" id="tip2"></div>
+        </div>
+        <div class="legend">
+          <span><i style="background:var(--cy)"></i>trial score</span>
+          <span><i style="background:var(--vio)"></i>best so far</span>
+          <span><i style="background:var(--bad)"></i>crash</span>
+          <span><i style="background:var(--warn)"></i>no score</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="picks" id="picks"></div>
+
+    <div class="card">
+      <div class="card-h">Trials <span class="tag" id="tblTag">newest first</span></div>
+      <div class="tblwrap">
+        <table>
+          <thead><tr>
+            <th>#</th><th>Core</th><th>Mem</th><th>REL</th><th>Cap</th>
+            <th>Score</th><th>Avg W</th><th>Max °C</th><th>Status</th>
+          </tr></thead>
+          <tbody id="tbody">
+            <tr><td colspan="9" class="empty">No trials yet — run the tuner to populate data/live.json.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="bottomrow">
+      <div class="card">
+        <div class="card-h">Safety envelope</div>
+        <div class="card-b tight">
+          <div class="row"><span>Temp abort</span><span class="warn">85 °C</span></div>
+          <div class="row"><span>Core offset clamp</span><span>+200 MHz</span></div>
+          <div class="row"><span>Mem offset clamp</span><span>+1400 MHz</span></div>
+          <div class="row"><span>Restore on abort</span><span class="ok">enabled</span></div>
+          <div class="row"><span>BIOS override</span><span style="color:var(--bad)">off-limits</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Run config</div>
+        <div class="card-b tight">
+          <div class="row"><span>Screen / soak</span><span>90 s / 600 s</span></div>
+          <div class="row"><span>Repeats / point</span><span>2</span></div>
+          <div class="row"><span>Trial budget</span><span id="budgetRow">24 / 60</span></div>
+          <div class="row"><span>Crashes seen</span><span style="color:var(--bad)" id="crashRow">0</span></div>
+          <div class="row"><span>Verified on front</span><span style="color:var(--ok)" id="verRow">0</span></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-h">Provenance</div>
+        <div class="card-b tight">
+          <div class="legend-row"><span class="chip prov-rec">readback</span><span><b>verifiable</b> — appears in <code>--status</code></span></div>
+          <div class="legend-row"><span class="chip prov-set">write-only</span><span><b>blind write</b> — CLI accepts, never reports back</span></div>
+          <div class="legend-row"><span class="chip prov-gui">gui only</span><span><b>unscriptable</b> — profiles/GUI, no CLI path</span></div>
+          <div style="font-size:10.5px;color:var(--tx3);line-height:1.55;margin-top:5px">
+            Ranges read live from
+            <code style="font-family:var(--mono);color:var(--tx2)">mVolt+.exe --status</code>.
+            Zero-width ranges are greyed as unavailable on this GPU.
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div class="statusbar">
+  <span class="mocknote" id="mockNote">&#9672; loading data/live.json…</span>
+  <span style="flex:1"></span>
+  <span>Trial <b id="sbTrial">0</b>/60</span>
+  <div class="prog"><i id="sbProg" style="width:0%"></i></div>
+  <span>stage <b id="sbStage">coarse grid</b></span>
+  <span>elapsed <b id="sbTime">0:00</b></span>
+</div>
+
+<script>
+/* ============================================================
+   Live view over data/live.json. If that file is absent (or has no
+   trials) the page falls back to a synthetic demo dataset so the
+   layout can be previewed without running the tuner.
+   ============================================================ */
+
+/* ---------- deterministic RNG ---------- */
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+
+/* ---------- knob definitions (from live probe) ---------- */
+const KNOBS = [
+  {id:'core',   label:'Core clock offset',   unit:'MHz', min:-1000, max:1000, step:25,   val:0,    avail:true,  swept:true,  badge:'rec',  grp:'Clocks'},
+  {id:'mem',    label:'Memory clock offset', unit:'MHz', min:-1000, max:3000, step:25,   val:0,    avail:true,  swept:true,  badge:'rec',  grp:'Clocks'},
+  {id:'clkmax', label:'Clock range max',     unit:'MHz', min:0,     max:2100, step:15,   val:2100, avail:true,  swept:false, badge:'rec',  grp:'Clocks'},
+  {id:'dummy1', label:'Boost lock',          unit:'',    min:0,     max:1,    step:1,    val:0,    avail:true,  swept:false, badge:'rec',  grp:'Clocks', toggle:true, note:'off during sweeps'},
+  {id:'rel',    label:'NVVDD REL offset',    unit:'mV',  min:-250,  max:85,   step:6.25, val:0,    avail:true,  swept:true,  badge:'rec',  grp:'Voltage'},
+  {id:'alt',    label:'NVVDD ALT/OP offset', unit:'mV',  min:-250,  max:85,   step:6.25, val:0,    avail:true,  swept:false, badge:'rec',  grp:'Voltage'},
+  {id:'vdem',   label:'Core voltage demand', unit:'mV',  min:-150,  max:50,   step:5,    val:0,    avail:true,  swept:false, badge:'set',  grp:'Voltage'},
+  {id:'boost',  label:'Voltage boost',       unit:'%',   min:0,     max:100,  step:5,    val:0,    avail:true,  swept:false, badge:'rec',  grp:'Voltage'},
+  {id:'cap',    label:'Power cap',           unit:'W',   min:1,     max:85,   step:1,    val:80,   avail:true,  swept:true,  badge:'rec',  grp:'Power'},
+  {id:'xbar',   label:'XBAR clock offset',   unit:'MHz', min:0,     max:0,    step:1,    val:0,    avail:false, swept:false, badge:'none', grp:'Fabric'},
+  {id:'sys',    label:'SYS clock offset',    unit:'MHz', min:0,     max:0,    step:1,    val:0,    avail:false, swept:false, badge:'none', grp:'Fabric'},
+  {id:'video',  label:'Video clock offset',  unit:'MHz', min:0,     max:0,    step:1,    val:0,    avail:false, swept:false, badge:'none', grp:'Fabric'},
+  {id:'msvdd',  label:'MSVDD offsets',       unit:'mV',  min:0,     max:0,    step:1,    val:0,    avail:false, swept:false, badge:'none', grp:'Fabric'},
+  {id:'therm',  label:'Thermal input override', unit:'°C', min:0,   max:0,    step:1,    val:0,    avail:false, swept:false, badge:'none', grp:'Thermal'},
+];
+
+/* Real knobs with no CLI entry point — reachable only through the GUI/profiles. */
+const NONCLI = [
+  {label:'Core V/F curve',      badge:'gui'},
+  {label:'Board input current', badge:'gui'},
+  {label:'NVVDD OCP limit',     badge:'set'},
+  {label:'MSVDD OCP limit',     badge:'set'},
+];
+
+/* ---------- provenance badge ---------- */
+function provChip(b){
+  if (b === 'rec') return '<span class="chip prov-rec">readback</span>';
+  if (b === 'set') return '<span class="chip prov-set">write-only</span>';
+  if (b === 'gui') return '<span class="chip prov-gui">gui only</span>';
+  return '';
+}
+
+/* ---------- render knobs ---------- */
+(function renderKnobs(){
+  const root = document.getElementById('knobs');
+  let lastGrp = null;
+  for (const k of KNOBS.filter(x => x.avail)){
+    if (k.grp !== lastGrp){
+      const g = document.createElement('div');
+      g.className = 'grp';
+      g.textContent = k.grp;
+      root.appendChild(g);
+      lastGrp = k.grp;
+    }
+    const wrap = document.createElement('div');
+    wrap.className = 'knob' + (k.avail ? '' : ' locked');
+
+    const head = document.createElement('div');
+    head.className = 'khead';
+    head.innerHTML =
+      '<span class="kname">' + k.label + '</span>' +
+      '<span class="kval' + (k.avail ? '' : ' muted') + '" id="v_' + k.id + '">' +
+      (k.avail ? fmtVal(k) : 'unavailable') + '</span>';
+    wrap.appendChild(head);
+
+    if (k.toggle){
+      const sw = document.createElement('div');
+      sw.className = 'sw';
+      sw.innerHTML = '<input type="checkbox" id="t_' + k.id + '"' + (k.val ? ' checked' : '') + '>' +
+                     '<label for="t_' + k.id + '"></label>' +
+                     '<span style="font-size:10.5px;color:var(--tx3)">' + (k.note || '') + '</span>';
+      wrap.appendChild(sw);
+
+      const tfoot = document.createElement('div');
+      tfoot.className = 'kfoot';
+      tfoot.innerHTML = '<span></span><span class="chips">' +
+        '<span class="chip off">pinned</span>' + provChip(k.badge) + '</span><span></span>';
+      wrap.appendChild(tfoot);
+    } else {
+      const r = document.createElement('input');
+      r.type = 'range'; r.min = k.min; r.max = k.max; r.step = k.step; r.value = k.val;
+      r.id = 'r_' + k.id;
+      if (!k.avail) r.disabled = true;
+      r.addEventListener('input', () => {
+        k.val = parseFloat(r.value);
+        document.getElementById('v_' + k.id).textContent = fmtVal(k);
+      });
+      wrap.appendChild(r);
+
+      const foot = document.createElement('div');
+      foot.className = 'kfoot';
+      foot.innerHTML = '<span>' + k.min + '</span>' +
+        '<span class="chips">' +
+          (k.swept ? '<span class="chip">swept</span>' : '<span class="chip off">pinned</span>') +
+          provChip(k.badge) +
+        '</span>' +
+        '<span>' + k.max + '</span>';
+      wrap.appendChild(foot);
+    }
+    root.appendChild(wrap);
+  }
+
+  const g2 = document.createElement('div');
+  g2.className = 'grp';
+  g2.textContent = 'Set outside the CLI';
+  root.appendChild(g2);
+  const nb = document.createElement('div');
+  nb.className = 'noncli';
+  nb.innerHTML = NONCLI.map(x =>
+    '<div class="nrow"><span>' + x.label + '</span>' + provChip(x.badge) + '</div>'
+  ).join('');
+  root.appendChild(nb);
+
+  const un = KNOBS.filter(x => !x.avail);
+  if (un.length){
+    const g = document.createElement('div');
+    g.className = 'grp';
+    g.textContent = 'Not on this GPU';
+    root.appendChild(g);
+    const box = document.createElement('div');
+    box.className = 'unavail';
+    box.innerHTML = un.map(x =>
+      '<div class="urow"><span>' + x.label + '</span><span>unavailable</span></div>'
+    ).join('');
+    root.appendChild(box);
+  }
+
+  function fmtVal(k){
+    const v = k.val;
+    const s = Number.isInteger(v) ? String(v) : v.toFixed(2).replace(/\.?0+$/,'');
+    return s + (k.unit ? ' ' + k.unit : '');
+  }
+})();
+
+/* ---------- synthetic objective ---------- */
+const rnd = mulberry32(0x2F7A11);
+
+function evaluate(core, mem, rel, cap){
+  // voltage headroom: lower REL ceiling -> less voltage drop -> more sustained clock headroom
+  const undervolt = Math.max(0, -rel);
+  const overvolt  = Math.max(0, rel);
+
+  const wattsUncapped = 52 + core*0.072 + overvolt*0.10 - undervolt*0.085 + mem*0.0032 + (rnd()*2-1)*1.2;
+  const capped = wattsUncapped > cap;
+  const watts = Math.min(wattsUncapped, cap);
+
+  let score = 4080
+    + core * 1.78
+    + undervolt * 1.62
+    + mem * 0.295
+    - (capped ? (wattsUncapped - cap) * 12.5 : 0);
+
+  // diminishing returns + instability past the sweet spot
+  if (core > 200) score -= (core - 200) * 0.85;
+  if (mem > 1100) score -= (mem - 1100) * 0.45;
+  if (undervolt > 150) score -= (undervolt - 150) * 1.1;
+
+  score += (rnd()*2 - 1) * 34; // measurement noise
+
+  // failure probability grows away from a sane operating region
+  const pCrash = 0.015
+    + Math.max(0, core - 185) / 900
+    + Math.max(0, undervolt - 145) / 1400
+    + Math.max(0, mem - 1050) / 1600
+    + Math.max(0, overvolt - 40) / 1200;
+  const roll = rnd();
+
+  let status = 'ok';
+  if (roll < pCrash)               status = 'crash';
+  else if (roll < pCrash + 0.035)  status = 'nos';
+  else if (rnd() < 0.06)           status = 'crash';
+
+  // A failed run yields no benchmark result. Never fabricate a score for it.
+  if (status !== 'ok') score = null;
+
+  const temp = Math.min(92, 57 + watts*0.325 + (rnd()*2-1)*1.6);
+  const clock = Math.round(1425 + core*0.52 + undervolt*0.20 + (rnd()*2-1)*18);
+
+  return {core, mem, rel, cap, score: score == null ? null : Math.round(score),
+          watts: +watts.toFixed(1), temp: +temp.toFixed(1), clock, status};
+}
+
+/* ---------- build a plausible search trajectory ---------- */
+const STRATEGY = [];
+// stage A: coarse grid over the 4 swept dims
+const gridCores = [-25, 75, 150, 210];
+const gridRels  = [-40, -105, -160];
+const gridCaps  = [85, 70];
+const gridMems  = [0, 900];
+for (const c of gridCores) for (const r of gridRels) for (const p of gridCaps) {
+  STRATEGY.push([c, gridMems[(STRATEGY.length + 1) % 2], r, p]);
+}
+// stage B: refine around low-REL high-core region
+const refineCores = [190, 205, 220, 235, 250, 230, 215, 195, 240, 245, 200, 225];
+const refineRels  = [-120, -145, -165, -135, -150, -140, -155, -125, -170, -130, -160, -148];
+const refineMems  = [700, 1150, 850, 1000, 1250, 900, 1100, 780, 1300, 950, 1050, 1180];
+const refineCaps  = [85, 85, 84, 83, 85, 84, 85, 82, 85, 84, 85, 83];
+for (let i = 0; i < refineCores.length; i++) {
+  STRATEGY.push([refineCores[i], refineMems[i], refineRels[i], refineCaps[i]]);
+}
+
+let TRIALS = STRATEGY.slice(0, 52).map((p, i) => {
+  const t = evaluate(p[0], p[1], p[2], p[3]);
+  t.n = i + 1;
+  t.soak = false;
+  return t;
+});
+
+// mark a few frontier survivors as soak-verified
+(function markSoaks(){
+  const ok = TRIALS.filter(t => t.status === 'ok');
+  const front = paretoOf(ok);
+  front.slice(0, 4).forEach(t => { t.status = 'verified'; t.soak = true; });
+})();
+
+function paretoOf(pts){
+  return pts.filter(a => !pts.some(b =>
+      b !== a && b.watts <= a.watts && b.score >= a.score &&
+      (b.watts < a.watts || b.score > a.score)
+  )).sort((x,y) => x.watts - y.watts);
+}
+
+/* ---------- stock reference ----------
+   Measured once at session start: offsets 0, REL 0, boost lock off,
+   power at default. Everything in the sweep is judged against this.     */
+let BASELINE = { score: 4310, watts: 62.0 };
+
+/* ---------- app state ---------- */
+const state = {
+  revealed: 0,
+  running: false,
+  paused: false,
+  timer: null,
+  tick: 0,
+  elapsed: 0,
+  temp: 46, power: 12, coreClk: 300, memClk: 405,
+  hist: {temp: [], power: [], core: [], mem: []},
+};
+
+/* ---------- SVG helpers ---------- */
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, parent){
+  const n = document.createElementNS(NS, tag);
+  for (const k in attrs) n.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(n);
+  return n;
+}
+
+/* ---------- Pareto chart ---------- */
+function drawPareto(){
+  const svg = document.getElementById('pareto');
+  svg.innerHTML = '';
+  const box = document.getElementById('paretoBox');
+  const W = box.clientWidth || 600, H = box.clientHeight || 296;
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+  const M = {l:46, r:14, t:12, b:30};
+  const iw = W - M.l - M.r, ih = H - M.t - M.b;
+
+  const pts = TRIALS.slice(0, state.revealed);
+  const okPts = pts.filter(t => t.status === 'ok' || t.status === 'verified');
+
+  // ---- adaptive axes: fit the revealed data instead of a fixed box ----
+  const scored = pts.filter(t => t.score != null);
+  let xMin = 40, xMax = 90, yMin = 3800, yMax = 5400;
+
+  if (scored.length >= 2){
+    const xs = scored.map(t => t.watts), ys = scored.map(t => t.score);
+    let x0 = Math.min(...xs), x1 = Math.max(...xs);
+    let y0 = Math.min(...ys), y1 = Math.max(...ys);
+    if (x1 - x0 < 6) { x0 -= 3; x1 += 3; }
+    if (y1 - y0 < 120) { y0 -= 60; y1 += 60; }
+    const padX = Math.max(2, (x1 - x0) * 0.10);
+    const padY = Math.max(50, (y1 - y0) * 0.14);
+    xMin = Math.floor((x0 - padX) / 5) * 5;
+    xMax = Math.ceil((x1 + padX) / 5) * 5;
+    yMin = Math.floor((y0 - padY) / 100) * 100;
+    yMax = Math.ceil((y1 + padY) / 100) * 100;
+  }
+
+  const X = v => M.l + (v - xMin) / (xMax - xMin) * iw;
+  const Y = v => M.t + ih - (v - yMin) / (yMax - yMin) * ih;
+
+  const xTicks = 6, yTicks = 5;
+  const xStep = Math.max(2, Math.round((xMax - xMin) / xTicks / 2) * 2);
+  const yStep = Math.max(50, Math.round((yMax - yMin) / yTicks / 50) * 50);
+
+  // grid
+  for (let v = Math.ceil(xMin / xStep) * xStep; v <= xMax; v += xStep){
+    el('line', {x1:X(v), y1:M.t, x2:X(v), y2:M.t+ih, stroke:'#16212f', 'stroke-width':1}, svg);
+    const t = el('text', {x:X(v), y:H-10, fill:'#4a5c73', 'font-size':9.5, 'text-anchor':'middle',
+                          'font-family':'ui-monospace,monospace'}, svg);
+    t.textContent = v + 'W';
+  }
+  for (let v = Math.ceil(yMin / yStep) * yStep; v <= yMax; v += yStep){
+    el('line', {x1:M.l, y1:Y(v), x2:M.l+iw, y2:Y(v), stroke:'#16212f', 'stroke-width':1}, svg);
+    const t = el('text', {x:M.l-7, y:Y(v)+3.5, fill:'#4a5c73', 'font-size':9.5, 'text-anchor':'end',
+                          'font-family':'ui-monospace,monospace'}, svg);
+    t.textContent = v;
+  }
+  const yl = el('text', {x:12, y:M.t+ih/2, fill:'#4a5c73', 'font-size':9.5, 'text-anchor':'middle',
+                         transform:'rotate(-90 12 ' + (M.t+ih/2) + ')','letter-spacing':'.08em'}, svg);
+  yl.textContent = 'SCORE';
+
+  // ---- stock baseline reference: everything above this line beat stock ----
+  if (BASELINE.score > yMin && BASELINE.score < yMax){
+    const by = Y(BASELINE.score);
+    el('line', {x1:M.l, y1:by, x2:M.l+iw, y2:by, stroke:'#7c8da6', 'stroke-width':1,
+                'stroke-dasharray':'3 4', opacity:.55}, svg);
+    const bl = el('text', {x:M.l+5, y:by-5, fill:'#9fb0c4', 'font-size':8.5,
+                           'letter-spacing':'.08em','font-family':'ui-monospace,monospace'}, svg);
+    bl.textContent = 'STOCK ' + BASELINE.score;
+  }
+  if (BASELINE.watts > xMin && BASELINE.watts < xMax){
+    const bx = X(BASELINE.watts);
+    el('line', {x1:bx, y1:M.t, x2:bx, y2:M.t+ih, stroke:'#7c8da6', 'stroke-width':1,
+                'stroke-dasharray':'3 4', opacity:.35}, svg);
+    if (BASELINE.score > yMin && BASELINE.score < yMax){
+      const by = Y(BASELINE.score), bx2 = X(BASELINE.watts);
+      el('polygon', {points:bx2+','+(by-5)+' '+(bx2+5)+','+by+' '+bx2+','+(by+5)+' '+(bx2-5)+','+by,
+                     fill:'#0a0e14', stroke:'#c3d2e4', 'stroke-width':1.4}, svg);
+      const tl = el('text', {x:bx2+9, y:by+13, fill:'#8fa3bb', 'font-size':8.5,
+                             'font-family':'ui-monospace,monospace'}, svg);
+      tl.textContent = 'stock ' + BASELINE.watts.toFixed(1) + 'W';
+    }
+  }
+
+  // frontier
+  const front = paretoOf(okPts);
+  if (front.length > 1){
+    const d = front.map((p,i) => (i ? 'L' : 'M') + X(p.watts) + ' ' + Y(p.score)).join(' ');
+    el('path', {d, fill:'none', stroke:'#38bdf8', 'stroke-width':1.6, opacity:.55,
+                'stroke-dasharray':'4 4'}, svg);
+  }
+  // area under front (subtle)
+  if (front.length > 1){
+    const d = front.map((p,i) => (i ? 'L' : 'M') + X(p.watts) + ' ' + Y(p.score)).join(' ')
+            + ' L' + X(front[front.length-1].watts) + ' ' + (M.t+ih)
+            + ' L' + X(front[0].watts) + ' ' + (M.t+ih) + ' Z';
+    el('path', {d, fill:'#38bdf8', opacity:.055}, svg);
+  }
+
+  // points — only trials that actually produced a score belong on this chart
+  for (const p of scored){
+    const isFront = front.includes(p);
+    let fill = '#34d399', r = 4.6, stroke = 'none', sw = 0;
+    if (p.status === 'crash'){ fill='#f87171'; r=4.2; }
+    if (p.status === 'nos'){ fill='#fbbf24'; r=4.2; }
+    if (p.status === 'verified'){ fill='#7dd3fc'; r=5.4; stroke='#a5e9ff'; sw=1.4; }
+    if (isFront && p.status === 'ok'){ stroke='#34d399'; sw=1.2; }
+
+    const c = el('circle', {cx:X(p.watts), cy:Y(p.score), r, fill, stroke, 'stroke-width':sw,
+                            opacity:.92, style:'cursor:pointer'}, svg);
+    c.addEventListener('mouseenter', () => {
+      const tip = document.getElementById('tip1');
+      tip.innerHTML =
+        'trial <b>#' + p.n + '</b> · ' + p.status.toUpperCase() + '<br>' +
+        'core ' + (p.core>0?'+':'') + p.core + ' MHz<br>' +
+        'mem ' + (p.mem>0?'+':'') + p.mem + ' MHz<br>' +
+        'REL ' + (p.rel>0?'+':'') + p.rel.toFixed(2) + ' mV<br>' +
+        'cap ' + p.cap + ' W<br>' +
+        '<b>' + (p.score||'—') + '</b> pts · ' + p.watts + ' W · ' + (p.temp) + ' °C';
+      tip.style.left = Math.min(X(p.watts)+12, W-190) + 'px';
+      tip.style.top  = Math.max(Y(p.score)-14, 8) + 'px';
+      tip.classList.add('on');
+    });
+    c.addEventListener('mouseleave', () => document.getElementById('tip1').classList.remove('on'));
+  }
+
+  document.getElementById('frontTag').textContent = front.length + ' on front · ' + pts.length + ' trials';
+}
+
+/* ---------- progress chart ---------- */
+function drawProg(){
+  const svg = document.getElementById('prog');
+  svg.innerHTML = '';
+  const box = document.getElementById('progBox');
+  const W = box.clientWidth || 380, H = box.clientHeight || 296;
+  svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+
+  const M = {l:38, r:12, t:12, b:26};
+  const iw = W - M.l - M.r, ih = H - M.t - M.b;
+
+  const pts = TRIALS.slice(0, state.revealed);
+  const maxN = 52;
+  const yMin = 3900, yMax = 5400;
+  const X = v => M.l + (v / maxN) * iw;
+  const Y = v => M.t + ih - (v - yMin) / (yMax - yMin) * ih;
+
+  for (let v = 4000; v <= yMax; v += 300){
+    el('line', {x1:M.l, y1:Y(v), x2:M.l+iw, y2:Y(v), stroke:'#16212f'}, svg);
+    const t = el('text', {x:M.l-6, y:Y(v)+3.5, fill:'#4a5c73','font-size':9.5,'text-anchor':'end',
+                          'font-family':'ui-monospace,monospace'}, svg);
+    t.textContent = v;
+  }
+  for (let v = 0; v <= maxN; v += 13){
+    const t = el('text', {x:X(v), y:H-8, fill:'#4a5c73','font-size':9.5,'text-anchor':'middle',
+                          'font-family':'ui-monospace,monospace'}, svg);
+    t.textContent = v;
+  }
+
+  // best-so-far staircase — only trials that produced a score advance the frontier
+  let best = 0; const stepPath = [];
+  pts.forEach(p => {
+    if (p.score != null && p.score > best) best = p.score;
+    stepPath.push([p.n, best]);
+  });
+  if (stepPath.length > 1){
+    const d = stepPath.map(([n,b],i) => (i?'L':'M') + X(n) + ' ' + Y(b)).join(' ');
+    el('path', {d, fill:'none', stroke:'#a78bfa', 'stroke-width':1.6, opacity:.85}, svg);
+  }
+
+  // trial dots; failed runs get a marker on a baseline lane instead of a fake score
+  for (const p of pts){
+    if (p.score == null){
+      const col = p.status === 'crash' ? '#f87171' : '#fbbf24';
+      const c = el('circle', {cx:X(p.n), cy:M.t+ih-4, r:3, fill:col, opacity:.9, style:'cursor:pointer'}, svg);
+      c.addEventListener('mouseenter', () => {
+        const tip = document.getElementById('tip2');
+        tip.innerHTML = 'trial <b>#' + p.n + '</b><br>no result<br>' + p.status.toUpperCase();
+        tip.style.left = Math.min(X(p.n)+10, W-130) + 'px';
+        tip.style.top  = Math.max(M.t+ih-46, 6) + 'px';
+        tip.classList.add('on');
+      });
+      c.addEventListener('mouseleave', () => document.getElementById('tip2').classList.remove('on'));
+      continue;
+    }
+    let fill = '#38bdf8', r = 3.2;
+    if (p.status === 'crash'){ fill = '#f87171'; r = 3.6; }
+    if (p.status === 'nos'){ fill = '#fbbf24'; r = 3.4; }
+    if (p.status === 'verified'){ fill = '#7dd3fc'; r = 4.2; }
+    if (p.score == null){ continue; }
+    const c = el('circle', {cx:X(p.n), cy:Y(p.score), r, fill, opacity:.9, style:'cursor:pointer'}, svg);
+    c.addEventListener('mouseenter', () => {
+      const tip = document.getElementById('tip2');
+      tip.innerHTML = 'trial <b>#' + p.n + '</b><br>' + (p.score||'—') + ' pts<br>' + p.status.toUpperCase();
+      tip.style.left = Math.min(X(p.n)+10, W-130) + 'px';
+      tip.style.top  = Math.max(Y(p.score)-10, 6) + 'px';
+      tip.classList.add('on');
+    });
+    c.addEventListener('mouseleave', () => document.getElementById('tip2').classList.remove('on'));
+  }
+}
+
+/* ---------- table ---------- */
+function drawTable(){
+  const body = document.getElementById('tbody');
+  const pts = TRIALS.slice(0, state.revealed).slice().reverse();
+  if (!pts.length){
+    body.innerHTML = '<tr><td colspan="9" class="empty">No trials yet — run the tuner to populate data/live.json.</td></tr>';
+    return;
+  }
+  body.innerHTML = pts.map(p => {
+    const cls = p.status === 'verified' ? 'ver' : p.status === 'ok' ? 'ok' : p.status === 'crash' ? 'crash' : 'ns';
+    const label = p.status === 'verified' ? 'soak ✓' : p.status === 'nos' ? 'no score' : p.status;
+    return '<tr>' +
+      '<td>' + p.n + '</td>' +
+      '<td class="params">' + (p.core>0?'+':'') + p.core + '</td>' +
+      '<td class="params">' + (p.mem>0?'+':'') + p.mem + '</td>' +
+      '<td class="params">' + p.rel.toFixed(1) + '</td>' +
+      '<td class="params">' + p.cap + '</td>' +
+      '<td>' + (p.score ?? '—') + '</td>' +
+      '<td>' + p.watts + '</td>' +
+      '<td>' + p.temp + '</td>' +
+      '<td><span class="pill ' + cls + '">' + label + '</span></td>' +
+    '</tr>';
+  }).join('');
+}
+
+/* ---------- telemetry ---------- */
+function sparkline(id, arr, color, min, max){
+  const svg = document.getElementById(id);
+  svg.innerHTML = '';
+  if (arr.length < 2) return;
+  const W = 110, H = 30;
+  const pts = arr.slice(-40).map((v,i,a) => {
+    const x = (i/(a.length-1))*W;
+    const y = H - ((v-min)/(max-min))*H;
+    return x + ',' + Math.max(0,Math.min(H,y));
+  }).join(' ');
+  el('polyline', {points:pts, fill:'none', stroke:color, 'stroke-width':1.2, opacity:.9}, svg);
+}
+
+function drawTelem(){
+  const t = state.temp, p = state.power, c = state.coreClk, m = state.memClk;
+
+  document.getElementById('tTemp').innerHTML = Math.round(t) + '<small>°C</small>';
+  document.getElementById('tPower').innerHTML = p.toFixed(1) + '<small>W</small>';
+  document.getElementById('tCore').innerHTML = Math.round(c) + '<small>MHz</small>';
+  document.getElementById('tMem').innerHTML = Math.round(m) + '<small>MHz</small>';
+
+  // limit reason
+  let reason = 'None', rc = 'var(--tx2)';
+  if (t > 82) { reason = 'Temp'; rc = 'var(--bad)'; }
+  else if (p > 79) { reason = 'Power'; rc = 'var(--vio)'; }
+  else if (state.running) { reason = 'Util'; rc = 'var(--tx2)'; }
+  const tl = document.getElementById('tLimit');
+  tl.textContent = reason; tl.style.color = rc;
+
+  document.getElementById('bTemp').style.width  = Math.min(100, (t/100)*100) + '%';
+  document.getElementById('bTemp').style.background = t > 82 ? 'var(--bad)' : t > 75 ? 'var(--warn)' : 'var(--ok)';
+  document.getElementById('bPower').style.width = Math.min(100, (p/85)*100) + '%';
+  document.getElementById('bCore').style.width  = Math.min(100, (c/2100)*100) + '%';
+  document.getElementById('bMem').style.width   = Math.min(100, (m/3500)*100) + '%';
+
+  sparkline('sTemp', state.hist.temp, '#f87171', 40, 90);
+  sparkline('sPower', state.hist.power, '#a78bfa', 0, 90);
+  sparkline('sCore', state.hist.core, '#38bdf8', 0, 2100);
+  sparkline('sMem', state.hist.mem, '#34d399', 0, 3500);
+}
+
+/* ---------- state pill ---------- */
+function setState(cls, text){
+  const pill = document.getElementById('statePill');
+  pill.className = 'state ' + cls;
+  document.getElementById('stateText').textContent = text;
+}
+
+/* ---------- simulation loop ---------- */
+function tick(){
+  if (!state.running || state.paused) return;
+  state.tick++;
+
+  const cur = TRIALS[Math.min(state.revealed, TRIALS.length-1)];
+  const target = cur || {watts:60, temp:72, clock:1600, mem:3000};
+
+  // steer live values toward the trial's operating point
+  const wt = target.watts || 60;
+  const tt = target.temp || 72;
+
+  state.power  += (wt - state.power) * 0.18 + (Math.random()*2-1)*1.1;
+  state.temp   += (tt - state.temp) * 0.09 + (Math.random()*2-1)*0.55;
+  state.coreClk += ((target.clock||1600) - state.coreClk) * 0.16 + (Math.random()*2-1)*26;
+  state.memClk += ((2800 + (cur?.mem||0)*0.35) - state.memClk) * 0.2 + (Math.random()*2-1)*14;
+
+  state.power = Math.max(6, Math.min(88, state.power));
+  state.temp  = Math.max(38, Math.min(92, state.temp));
+
+  state.hist.temp.push(state.temp);
+  state.hist.power.push(state.power);
+  state.hist.core.push(state.coreClk);
+  state.hist.mem.push(state.memClk);
+  for (const k in state.hist) if (state.hist[k].length > 60) state.hist[k].shift();
+
+  drawTelem();
+
+  // reveal a trial every 2 ticks; each screening trial is ~90 simulated seconds
+  if (state.tick % 2 === 0 && state.revealed < 52){
+    state.revealed++;
+    state.elapsed += 90;
+    drawAll();
+  }
+  updateStatusbar();
+
+  if (state.revealed >= 52){
+    stop();
+    setState('', 'complete');
+  }
+}
+
+/* ---------- three picks ---------- */
+function cfgLine(p){
+  return (p.core >= 0 ? '+' : '') + p.core + ' core · ' +
+         (p.mem >= 0 ? '+' : '') + p.mem + ' mem · ' +
+         'REL ' + p.rel.toFixed(1) + ' · ' + p.cap + ' W cap';
+}
+
+function deltaChips(p){
+  const dScore = (p.score - BASELINE.score) / BASELINE.score * 100;
+  const dW = p.watts - BASELINE.watts;
+  const s = '<span class="d ' + (dScore >= 0 ? 'up' : 'down') + '">' +
+            (dScore >= 0 ? '▲' : '▼') + ' ' + Math.abs(dScore).toFixed(1) + '% score</span>';
+  const w = dW > 0.05 ? '<span class="d down">▲ ' + dW.toFixed(1) + ' W</span>'
+          : dW < -0.05 ? '<span class="d up">▼ ' + Math.abs(dW).toFixed(1) + ' W</span>'
+          : '<span class="d flat">≈ stock W</span>';
+  return s + w;
+}
+
+let SAFE_CEILING = 200;   // raised/lowered from recommendation.json when present
+
+function renderPicks(){
+  const host = document.getElementById('picks');
+  // Never recommend a config above the proven-safe ceiling: those have hung the
+  // machine even when a single run happened to complete.
+  const pts = TRIALS.slice(0, state.revealed)
+                   .filter(p => p.score != null && (p.status === 'ok' || p.status === 'verified'))
+                   .filter(p => (p.core || 0) <= SAFE_CEILING);
+
+  const defs = [
+    {cls:'p1', rank:'1', title:'Best raw performance',
+     note:'highest score, power be damned',
+     pick: p => p.score},
+    {cls:'p2', rank:'2', title:'Best stock upgrade',
+     note:'beats stock, lowest watts',
+     pick: null},
+    {cls:'p3', rank:'3', title:'Best efficiency',
+     note:'most points per watt',
+     pick: p => p.score / p.watts}
+  ];
+
+  const chosen = [null, null, null];
+  if (pts.length){
+    chosen[0] = pts.reduce((a,b) => b.score > a.score ? b : a);
+
+    const beat = pts.filter(p => p.score > BASELINE.score && p.watts < BASELINE.watts);
+    if (beat.length) chosen[1] = beat.reduce((a,b) => (b.score/b.watts) > (a.score/a.watts) ? b : a);
+
+    chosen[2] = pts.reduce((a,b) => (b.score/b.watts) > (a.score/a.watts) ? b : a);
+  }
+
+  host.innerHTML = defs.map((d, i) => {
+    const p = chosen[i];
+    if (!p){
+      return '<div class="pick ' + d.cls + ' empty">' +
+        '<div class="pick-h"><span class="pick-rank">' + d.rank + '</span>' + d.title + '</div>' +
+        '<div class="pick-score">—</div>' +
+        '<div class="pick-meta">' + (i === 1 ? 'nothing beats stock yet' : 'waiting for trials') + '</div>' +
+        '<div class="pick-note">' + d.note + '</div>' +
+      '</div>';
+    }
+    return '<div class="pick ' + d.cls + '">' +
+      '<div class="pick-h"><span class="pick-rank">' + d.rank + '</span>' + d.title + '</div>' +
+      '<div class="pick-score">' + p.score + '<small>pts · ' + p.watts.toFixed(1) + ' W</small></div>' +
+      '<div class="pick-meta">' + cfgLine(p) + '</div>' +
+      '<div class="pick-deltas">' + deltaChips(p) + '</div>' +
+      '<button class="pick-save" data-pick="' + i + '"' +
+        ' data-core="' + (p.core || 0) + '" data-mem="' + (p.mem || 0) + '"' +
+        ' data-rel="' + (p.rel || 0) + '">Save as mVolt+ profile</button>' +
+      '<div class="pick-msg" id="pickMsg' + i + '"></div>' +
+    '</div>';
+  }).join('');
+}
+
+function drawAll(){
+  drawPareto(); drawProg(); drawTable(); renderPicks();
+  const pts = TRIALS.slice(0, state.revealed);
+  const crashes = pts.filter(t => t.status === 'crash').length;
+  const ver = pts.filter(t => t.status === 'verified').length;
+  document.getElementById('crashRow').textContent = crashes;
+  document.getElementById('verRow').textContent = ver;
+  document.getElementById('budgetRow').textContent = pts.length + ' / 60';
+}
+
+function updateStatusbar(){
+  document.getElementById('sbTrial').textContent = state.revealed;
+  document.getElementById('sbProg').style.width = (state.revealed/52*100) + '%';
+  const m = Math.floor(state.elapsed/60), s = state.elapsed % 60;
+  document.getElementById('sbTime').textContent = m + ':' + String(s).padStart(2,'0');
+  document.getElementById('sbStage').textContent = state.revealed < 24 ? 'coarse grid' : 'BO refine';
+}
+
+/* ---------- controls ---------- */
+function start(){
+  if (state.revealed >= 52) reset();
+  state.running = true; state.paused = false;
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnPause').disabled = false;
+  document.getElementById('btnPause').textContent = 'Pause';
+  setState('run', 'running');
+  clearInterval(state.timer);
+  state.timer = setInterval(tick, 210);
+}
+function pause(){
+  if (!state.running) return;
+  state.paused = !state.paused;
+  document.getElementById('btnPause').textContent = state.paused ? 'Resume' : 'Pause';
+  setState(state.paused ? '' : 'run', state.paused ? 'paused' : 'running');
+}
+function stop(){
+  state.running = false;
+  clearInterval(state.timer);
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnPause').disabled = true;
+}
+function reset(){
+  stop();
+  state.revealed = 0; state.tick = 0; state.elapsed = 0;
+  state.temp = 46; state.power = 12; state.coreClk = 300; state.memClk = 405;
+  state.hist = {temp:[], power:[], core:[], mem:[]};
+  drawAll(); drawTelem(); setState('', 'idle');
+  document.getElementById('crashRow').textContent = '0';
+  document.getElementById('verRow').textContent = '0';
+  document.getElementById('budgetRow').textContent = '24 / 60';
+  updateStatusbar();
+}
+
+document.getElementById('btnStart').addEventListener('click', start);
+document.getElementById('btnPause').addEventListener('click', pause);
+document.getElementById('btnAbort').addEventListener('click', () => {
+  reset();
+  setState('crash', 'aborted — offsets restored');
+});
+
+/* ---------- boot ---------- */
+window.addEventListener('resize', () => { drawPareto(); drawProg(); });
+drawAll(); drawTelem(); updateStatusbar();
+setState('', 'idle');
+
+/* ---------- live data from the orchestrator ----------
+   data/live.json is written by Journal.write_live(). If present we replace the
+   synthetic TRIALS entirely and label the UI "live"; otherwise it stays mock. */
+async function loadLive(){
+  try {
+    const res = await fetch('/data/live.json', { cache: 'no-store' });
+    if (!res.ok) return false;
+    const j = await res.json();
+    if (!j.trials || !j.trials.length) return false;
+
+    const shortStatus = (t) => {
+      if (t.score != null) return 'ok';
+      if (t.status === 'crash') return 'crash';
+      return 'nos';
+    };
+
+    TRIALS = j.trials.map((t, i) => ({
+      n: i + 1,
+      core: (t.params && t.params.core) || 0,
+      mem: (t.params && t.params.mem) || 0,
+      rel: (t.params && t.params.rel) || 0,
+      cap: (t.params && t.params.cap) || 0,
+      score: t.score,
+      watts: t.watts || 0,
+      temp: t.temp || 0,
+      clk: t.clk || 0,
+      status: shortStatus(t)
+    }));
+
+    const base = TRIALS.find(m => m.core === 0 && m.mem === 0 && m.score != null);
+    if (base) BASELINE = { score: base.score, watts: base.watts };
+
+    state.revealed = TRIALS.length;
+    const b = document.getElementById('srcBadge');
+    b.textContent = j.running ? 'live · running' : 'live';
+    b.classList.remove('mock');
+    const note = document.getElementById('mockNote');
+    if (note) {
+      note.textContent = j.running
+        ? '\u25c8 LIVE - data/live.json (run in progress)'
+        : '\u25c8 LIVE - data/live.json';
+      note.style.color = '#34d399';
+    }
+    document.getElementById('sbTrial').textContent = j.completed != null ? j.completed : TRIALS.length;
+    drawAll();
+    return true;
+  } catch (e) { return false; }
+}
+loadLive();
+setInterval(loadLive, 5000);
+
+/* ---------- locked recommendation banner ---------- */
+async function loadVerdict(){
+  try {
+    const r = await fetch('/data/recommendation.json', { cache: 'no-store' });
+    if (!r.ok) return;
+    const v = await r.json();
+    if (v.ceiling_mhz) SAFE_CEILING = Number(v.ceiling_mhz);
+    const el = document.getElementById('verdict');
+    el.innerHTML =
+      '<span class="v-label">\u25cf recommended</span>' +
+      '<span class="v-title">' + v.title + '</span>' +
+      '<span style="color:var(--tx2)">' + (v.detail || '') + '</span>' +
+      '<span class="v-gain">+' + Number(v.gain_pct).toFixed(2) + '% vs stock</span>' +
+      '<span class="v-note">stock ' + Math.round(v.stock_mean) + ' (n=' + v.stock_n + ') \u00b7 ' +
+        'best ' + Math.round(v.best_mean) + ' (n=' + v.best_n + ')<br>' +
+        'safe ceiling ' + v.ceiling_mhz + ' MHz \u00b7 ' + v.unsafe_mhz + ' MHz hangs the machine</span>';
+    el.style.display = 'flex';
+  } catch (e) { /* no recommendation file - stay hidden */ }
+}
+loadVerdict();
+
+/* ---------- save a pick as an mVolt+ profile ---------- */
+document.addEventListener('click', async (ev) => {
+  const btn = ev.target.closest('.pick-save');
+  if (!btn) return;
+
+  const idx  = btn.getAttribute('data-pick');
+  const msg  = document.getElementById('pickMsg' + idx);
+  const name = 'tuner-best-' + (Number(idx) + 1);
+  const params = {
+    core: Number(btn.getAttribute('data-core')) || 0,
+    mem:  Number(btn.getAttribute('data-mem'))  || 0,
+    rel:  Number(btn.getAttribute('data-rel'))  || 0
+  };
+
+  btn.disabled = true;
+  msg.className = 'pick-msg';
+  msg.textContent = 'writing profile…';
+
+  try {
+    const res = await fetch('/api/profile', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: name, params: params })
+    });
+    const out = await res.json();
+
+    if (res.ok) {
+      msg.className = 'pick-msg ok';
+      msg.textContent = '✓ wrote "' + out.id + '" (' + out.controls + ' controls, rev ' + out.revision + ')';
+    } else {
+      msg.className = 'pick-msg err';
+      msg.textContent = out.error || ('failed (' + res.status + ')');
+    }
+  } catch (err) {
+    msg.className = 'pick-msg err';
+    msg.textContent = 'no API — start with: python -m tuner --serve';
+  } finally {
+    btn.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
+

@@ -1,0 +1,24 @@
+# runtime state - never commit
+state/
+data/
+scripts/*.log
+*.log
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# editors / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+_scores.csv
+*/_scores.csv
