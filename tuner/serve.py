@@ -77,6 +77,16 @@ class Handler(SimpleHTTPRequestHandler):
             except Exception as exc:
                 self._json(500, {"error": str(exc)})
             return
+        if route == "/api/importance":
+            try:
+                from . import importance
+                j = state.Journal()
+                swept = j.get_meta("swept_knobs", "") or ""
+                only = {k for k in swept.split(",") if k} or None
+                self._json(200, importance.knob_effects(_journal_trials(), only=only))
+            except Exception as exc:
+                self._json(500, {"error": str(exc)})
+            return
         if route in ("/", "/index.html"):
             self.send_response(302)
             self.send_header("Location", "/web/index.html")

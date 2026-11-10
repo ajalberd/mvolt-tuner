@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mVolt Tuner — Knob importance</title>
+<style>
+  :root{
+    --bg:#080b10; --panel:#0d1219; --line:#1b2430; --tx:#e6edf6; --tx2:#9fb0c6;
+    --tx3:#6b7c93; --ok:#34d399; --warn:#fbbf24; --blue:#38bdf8; --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);
+       font:13px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+  header{display:flex;align-items:center;gap:14px;padding:14px 20px;border-bottom:1px solid var(--line)}
+  .logo{width:26px;height:26px;border-radius:7px;background:linear-gradient(135deg,#2563eb,#0ea5e9);
+        display:grid;place-items:center;font-weight:800;font-size:13px}
+  h1{font-size:15px;margin:0;font-weight:650;letter-spacing:-.01em}
+  .sub{color:var(--tx3);font-size:11.5px}
+  nav{margin-left:auto;display:flex;gap:10px}
+  nav a{color:var(--tx2);text-decoration:none;font-size:12px;padding:6px 11px;
+        border:1px solid var(--line);border-radius:7px}
+  nav a:hover{color:var(--tx);border-color:#2b3a4d}
+  main{padding:18px 20px;max-width:1280px;margin:0 auto}
+  .note{color:var(--tx3);font-size:11.5px;margin:0 0 16px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media (max-width:900px){.cols{grid-template-columns:1fr}}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:14px 16px}
+  .card h2{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--tx3);
+           margin:0 0 14px;font-weight:700}
+  .row{margin-bottom:13px}
+  .row .lab{display:flex;justify-content:space-between;align-items:baseline;
+            font-size:12px;margin-bottom:5px}
+  .row .knob{font-family:var(--mono);color:var(--tx)}
+  .row .val{font-family:var(--mono);font-size:11px;color:var(--tx3)}
+  .bar{height:9px;background:#111a24;border-radius:5px;overflow:hidden}
+  .bar > i{display:block;height:100%;border-radius:5px;background:linear-gradient(90deg,#1d4ed8,#38bdf8)}
+  .bar.w > i{background:linear-gradient(90deg,#b45309,#fbbf24)}
+  .empty{color:var(--tx3);font-size:12px;padding:8px 0}
+  .untested{margin-top:18px;font-size:11.5px;color:var(--tx3)}
+  .untested code{font-family:var(--mono);color:var(--tx2);background:#0f1620;
+                 padding:1px 5px;border-radius:4px;margin-right:5px}
+  footer{padding:14px 20px;color:var(--tx3);font-size:11px;border-top:1px solid var(--line);margin-top:22px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">m</div>
+  <div>
+    <h1>Knob importance</h1>
+    <div class="sub" id="sub">loading…</div>
+  </div>
+  <nav>
+    <a href="/">← Trials</a>
+  </nav>
+</header>
+
+<main>
+  <p class="note" id="note"></p>
+  <div class="cols">
+    <section class="card">
+      <h2>Effect on score</h2>
+      <div id="scoreBody"><div class="empty">loading…</div></div>
+    </section>
+    <section class="card">
+      <h2>Effect on wattage</h2>
+      <div id="wattBody"><div class="empty">loading…</div></div>
+    </section>
+  </div>
+  <div class="untested" id="untested"></div>
+</main>
+
+<footer>eta² is computed from the trial journal. Small samples make it noisy — treat values under 0.2 as weak evidence.</footer>
+
+<script>
+const fmt = (x, d = 2) => (x === null || x === undefined) ? '—' : Number(x).toFixed(d);
+
+function renderList(host, knobs, outcome, cls){
+  if (!knobs.length){
+    host.innerHTML = '<div class="empty">No knob was varied more than once yet — run a sweep to get an effect estimate.</div>';
+    return;
+  }
+  const max = Math.max(...knobs.map(k => k[outcome + '_eta2'] || 0), 0.0001);
+  host.innerHTML = knobs.map(k => {
+    const eta = k[outcome + '_eta2'];
+    const pct = ((eta || 0) / max) * 100;
+    const spread = k[outcome + '_spread'];
+    const unit = outcome === 'score' ? 'pts' : 'W';
+    return '<div class="row">' +
+      '<div class="lab"><span class="knob">' + k.knob + '</span>' +
+      '<span class="val">η² ' + fmt(eta, 3) + ' · Δ ' + fmt(spread, 1) + ' ' + unit +
+      ' · ' + k.levels + ' levels</span></div>' +
+      '<div class="bar ' + cls + '"><i style="width:' + Math.max(pct, 1.5) + '%"></i></div>' +
+    '</div>';
+  }).join('');
+}
+
+async function load(){
+  try{
+    const r = await fetch('/api/importance', {cache: 'no-store'});
+    const j = await r.json();
+    document.getElementById('sub').textContent =
+      j.trials ? j.trials + ' scored trials' : 'no trials yet';
+    document.getElementById('note').textContent = j.note || '';
+
+    const byScore = (j.knobs || []).slice();
+    renderList(document.getElementById('scoreBody'), byScore, 'score', '');
+
+    const byWatt = (j.knobs || []).slice().sort(
+      (a, b) => (b.watts_eta2 || 0) - (a.watts_eta2 || 0));
+    renderList(document.getElementById('wattBody'), byWatt, 'watts', 'w');
+
+    const un = j.untested || [];
+    document.getElementById('untested').innerHTML = un.length
+      ? 'Not varied, so not scored: ' + un.map(u => '<code>' + u.knob + '</code>').join('')
+      : '';
+  } catch (e){
+    document.getElementById('sub').textContent = 'API unavailable';
+    document.getElementById('scoreBody').innerHTML =
+      '<div class="empty">Start the server: python -m tuner --serve</div>';
+    document.getElementById('wattBody').innerHTML = '';
+  }
+}
+load();
+</script>
+</body>
+</html>

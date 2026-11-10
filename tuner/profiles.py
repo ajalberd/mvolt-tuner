@@ -118,6 +118,13 @@ def write_profile(name: str, params: dict[str, Any],
         raise ProfileError("refusing to write a profile with empty controls")
 
     existing = [p for p in (doc.get("profiles") or []) if p.get("id") != name]
+    clobbered = [p for p in (doc.get("profiles") or []) if p.get("id") == name]
+    # Never silently overwrite a profile the user made themselves.
+    if clobbered and not str(name).startswith("tuner-"):
+        raise ProfileError(
+            f"a profile named '{name}' already exists and was not created by this "
+            f"tool; refusing to overwrite it"
+        )
     existing.append({
         "id": name,
         "name": name,
@@ -171,6 +178,27 @@ def read_profiles() -> list[dict[str, Any]]:
                                  if isinstance(v, dict) and v.get("enabled")],
         })
     return out
+
+
+def active_profile() -> dict[str, Any] | None:
+    """The profile mVolt+ is currently running, if any.
+
+    Falls back to the startup profile so a user who has configured one is
+    treated as having a baseline even before they apply it this session.
+    """
+    try:
+        doc = json.loads(profile_document().read_text(encoding="utf-8"))
+    except (ProfileError, OSError, ValueError):
+        return None
+    pid = doc.get("last_applied_profile_id") or doc.get("startup_profile_id")
+    if not pid:
+        return None
+    for p in doc.get("profiles") or []:
+        if p.get("id") == pid:
+            for rp in read_profiles():
+                if rp["id"] == pid:
+                    return {**rp, "source": "active" if doc.get("last_applied_profile_id") else "startup"}
+    return None
 
 
 def pick_configs(trials: list[dict[str, Any]], ceiling: int,

@@ -33,8 +33,14 @@ def restore_safe(simulate: bool) -> None:
 
 def build_grid(core_vals: list[int], mems: list[int], caps: list[int],
                rels: list[int] | None = None,
-               allow_above_safe: bool = False) -> list[dict[str, Any]]:
+               allow_above_safe: bool = False,
+               base: dict[str, int] | None = None) -> list[dict[str, Any]]:
     rels = rels or [0]
+    base = base or {}
+    # A user who already runs +150 core should sweep around that, not from zero.
+    core_vals = [v + int(base.get("core", 0)) for v in core_vals]
+    rels = [v + int(base.get("rel", 0)) for v in rels]
+    mems = [v + int(base.get("mem", 0)) for v in mems]
     top = max(core_vals) if core_vals else 0
     if top > config.MAX_AUTO_CORE_MHZ:
         if not allow_above_safe:
@@ -125,6 +131,9 @@ def main(argv: list[str] | None = None) -> int:
                     help="run the grid saved by --setup instead of the CLI ranges")
     ap.add_argument("--yes", action="store_true",
                     help="with --setup: accept every default without prompting")
+    ap.add_argument("--baseline-profile", type=str, default="",
+                    help="seed the grid from an existing mVolt+ profile "
+                         "('active' = whatever mVolt+ is currently using)")
     ap.add_argument("--serve", action="store_true",
                     help="serve the web UI + local API (writes profiles on click)")
     ap.add_argument("--port", type=int, default=8712)
@@ -242,6 +251,36 @@ def main(argv: list[str] | None = None) -> int:
     else:
         step = max(1, args.max_core // max(1, args.cores - 1))
         core_vals = [i * step for i in range(args.cores)]
+    # ---- baseline: an existing mVolt+ profile the user already runs ----
+    base: dict[str, int] = {}
+    if args.baseline_profile:
+        from . import profiles as _profiles
+        registry = getattr(_knobs, "KNOBS", {})
+        known = set(registry.keys()) if isinstance(registry, dict) else {k.key for k in registry}
+
+        if args.baseline_profile == "active":
+            prof = _profiles.active_profile()
+        else:
+            prof = next((p for p in _profiles.read_profiles()
+                         if p["id"] == args.baseline_profile
+                         or p["name"] == args.baseline_profile), None)
+
+        if not prof:
+            log(f"FATAL: baseline profile '{args.baseline_profile}' not found")
+            return 8
+
+        base = {k: int(v) for k, v in (prof.get("params") or {}).items() if v}
+        log(f"baseline profile '{prof['name']}' ({prof.get('source', 'named')}): "
+            f"{base or 'all offsets zero'}")
+        log(f"grid will be applied on top of this baseline")
+
+        # Anything the profile changes must be represented as a knob, or the
+        # tuner would be blind to it.
+        unknown = [c for c in (prof.get("enabled_controls") or []) if c not in known]
+        if unknown:
+            log(f"WARNING: profile enables controls the knob registry does not model: "
+                f"{', '.join(unknown)} - these will not be swept or reported")
+
     if args.from_config:
         from . import setup as _setup
         saved = _setup.load()
@@ -255,7 +294,7 @@ def main(argv: list[str] | None = None) -> int:
         log(f"grid from state/config.json: {len(grid)} combination(s)")
     else:
         try:
-            grid = build_grid(core_vals, mems, caps, rels, args.allow_above_safe)
+            grid = build_grid(core_vals, mems, caps, rels, args.allow_above_safe, base)
         except ValueError as exc:
             log(f"FATAL: {exc}")
             return 4
@@ -279,6 +318,17 @@ def main(argv: list[str] | None = None) -> int:
     boot = state.boot_id()
     journal = state.Journal()
     before = journal.completed_count()
+
+    # Remember which knobs this study actually varies. Importance analysis scores
+    # only these, so a control that merely appeared in one trial's params (a knob
+    # later dropped from the grid) cannot masquerade as important.
+    swept_now = sorted({k for p in grid for k in p
+                        if len({q.get(k) for q in grid}) > 1})
+    if swept_now:
+        prev = {k for k in (journal.get_meta("swept_knobs", "") or "").split(",") if k}
+        merged = sorted(prev | set(swept_now))
+        journal.set_meta("swept_knobs", ",".join(merged))
+        log(f"swept knobs: {','.join(merged)}")
     start_idx = int(journal.get_meta("next_index", "0") or 0)
     stalled = state.note_boot(boot, start_idx)
 
