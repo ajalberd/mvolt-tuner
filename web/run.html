@@ -1,0 +1,1073 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>mVolt Tuner — Setup &amp; Run</title>
+<link rel="icon" href="data:," />
+<style>
+  :root{
+    --bg:#0a0e14; --panel:#111925; --panel2:#151f2e; --line:#1e2b3d; --line2:#27384e;
+    --tx:#dbe6f3; --tx2:#8fa3bb; --tx3:#5c7089;
+    --cy:#38bdf8; --ok:#34d399; --warn:#fbbf24; --bad:#f87171; --vio:#a78bfa;
+    --mono: ui-monospace,"SF Mono","Cascadia Mono","Consolas",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;color:var(--tx);
+    background:radial-gradient(1200px 600px at 15% -10%,#12203a 0%,transparent 55%),var(--bg);
+    font:13px/1.5 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif;min-height:100vh}
+  .topbar{display:flex;align-items:center;gap:16px;padding:10px 18px;border-bottom:1px solid var(--line);
+    background:rgba(10,14,20,.85);position:sticky;top:0;z-index:5;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:650}
+  .logo{width:22px;height:22px;border-radius:6px;background:linear-gradient(140deg,var(--cy),#6366f1);
+    display:grid;place-items:center;font-size:11px;color:#03121c;font-weight:800}
+  .gpu{color:var(--tx2);font-size:12px;padding-left:14px;border-left:1px solid var(--line)}
+  .gpu b{color:var(--tx)}
+  nav{margin-left:auto;display:flex;gap:8px}
+  nav a{color:var(--tx2);text-decoration:none;font-size:12px;padding:6px 11px;border:1px solid var(--line);border-radius:7px}
+  nav a.on,nav a:hover{color:var(--tx);border-color:var(--line2);background:var(--panel)}
+  main{max-width:1100px;margin:0 auto;padding:18px 16px 60px;display:grid;gap:16px}
+  .banner{border:1px solid #5b4416;background:#1f1708;color:#f6d38a;border-radius:10px;padding:10px 14px;font-size:12.5px}
+  .banner.bad{border-color:#5b1f1f;background:#1f0b0b;color:#fca5a5}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px 18px}
+  .card.locked{opacity:.45;pointer-events:none}
+  .card h2{display:flex;align-items:center;gap:10px;margin:0 0 4px;font-size:15px;font-weight:650}
+  .step{width:22px;height:22px;border-radius:50%;display:grid;place-items:center;font-size:11.5px;font-weight:700;
+    background:var(--panel2);border:1px solid var(--line2);color:var(--tx2)}
+  .step.done{background:#0d2a20;border-color:#1f6b4f;color:var(--ok)}
+  .sub{color:var(--tx3);font-size:12px;margin:0 0 14px}
+  .row{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}
+  label.f{display:grid;gap:4px;font-size:12px;color:var(--tx2)}
+  label.f small{color:var(--tx3)}
+  input,select{background:#0b1119;border:1px solid var(--line2);color:var(--tx);border-radius:7px;
+    padding:7px 9px;font:inherit;font-family:var(--mono);font-size:12.5px}
+  input[type=number]{width:110px}
+  input:focus,select:focus{outline:2px solid #1d4ed8;outline-offset:1px}
+  button{font:inherit;font-size:12.5px;font-weight:600;border-radius:8px;padding:8px 14px;cursor:pointer;
+    border:1px solid var(--line2);background:var(--panel2);color:var(--tx)}
+  button.primary{background:linear-gradient(140deg,#0ea5e9,#2563eb);border-color:#2563eb;color:#fff}
+  button.danger{background:#2a1010;border-color:#7f1d1d;color:#fca5a5}
+  button:disabled{opacity:.45;cursor:not-allowed}
+  .msg{font-size:12px;margin-top:8px;min-height:18px}
+  .msg.ok{color:var(--ok)} .msg.err{color:var(--bad)}
+  .chip{display:inline-block;font-size:11px;padding:2px 8px;border-radius:99px;border:1px solid var(--line2);color:var(--tx2)}
+  .chip.ok{color:var(--ok);border-color:#1f6b4f} .chip.bad{color:var(--bad);border-color:#7f1d1d}
+  .chip.warn{color:var(--warn);border-color:#6b5517}
+  table{width:100%;border-collapse:collapse;font-size:12px}
+  th{text-align:left;color:var(--tx3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em;
+    padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:6px 8px;border-bottom:1px solid #162131;vertical-align:middle}
+  td.m{font-family:var(--mono);white-space:nowrap}
+  tr.off td{color:var(--tx3)}
+  .scroll{overflow-x:auto}
+  .knobs input[type=number]{width:84px}
+  .knobs td.inputs{white-space:nowrap}
+  .knobs td.inputs span{color:var(--tx3);font-size:11px;margin:0 4px}
+  .hint{color:var(--tx3);font-size:11.5px}
+  .preview{margin-top:12px;background:#0b1119;border:1px solid var(--line);border-radius:9px;padding:10px 12px}
+  .preview .big{font-size:18px;font-weight:650}
+  pre.log{background:#070b11;border:1px solid var(--line);border-radius:9px;padding:10px 12px;max-height:340px;
+    overflow:auto;font:11.5px/1.45 var(--mono);color:#b9c7d8;white-space:pre-wrap;margin:12px 0 0}
+  .status{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-top:12px;font-size:12.5px}
+  .dot{width:9px;height:9px;border-radius:50%;background:var(--tx3);display:inline-block;margin-right:6px}
+  .dot.run{background:var(--ok);box-shadow:0 0 10px var(--ok)}
+  details summary{cursor:pointer;color:var(--tx2);font-size:12px;margin-top:8px}
+  .tabs{display:flex;gap:6px;margin:8px 0 12px}
+  .tab{background:transparent;border:1px solid var(--line2);color:var(--tx2);font-weight:600}
+  .tab.on{background:var(--panel2);color:var(--tx);border-color:#2563eb}
+  .stages{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+  .stage{display:grid;grid-template-columns:auto 1fr;gap:2px 8px;align-items:center;padding:10px 12px;
+    border:1px solid var(--line2);border-radius:10px;cursor:pointer;background:#0b1119}
+  .stage.on{border-color:#2563eb;background:#0c1626}
+  .stage span{grid-column:2;color:var(--tx3);font-size:12px}
+  .stage.disabled{opacity:.45;pointer-events:none}
+  .stages3{grid-template-columns:1fr 1fr 1fr 1fr}
+  @media (max-width:900px){.stages3{grid-template-columns:1fr 1fr}}
+  @media (max-width:560px){.stages3{grid-template-columns:1fr}}
+  .sect{font-size:13px;font-weight:650;margin:16px 0 4px}
+  td.good{color:var(--ok)} td.bad{color:var(--bad)} td.muted{color:var(--tx3)}
+  .ibar{height:7px;background:#111a24;border-radius:4px;overflow:hidden;min-width:120px}
+  .ibar > i{display:block;height:100%;background:linear-gradient(90deg,#1d4ed8,#38bdf8)}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><div class="logo">m</div>mVolt Tuner</div>
+  <div class="gpu" id="gpu">connecting…</div>
+  <nav>
+    <a href="/web/run.html" class="on">Setup &amp; Run</a>
+    <a href="/web/index.html">Results</a>
+    <a href="/web/importance.html">Knob importance</a>
+  </nav>
+</header>
+
+<main>
+  <div id="banners"></div>
+
+  <!-- benchmark -->
+  <section class="card" id="c0">
+    <div class="row" style="align-items:center">
+      <label class="f">Benchmark<select id="benchTool"></select></label>
+      <span class="hint" id="benchHint"></span>
+    </div>
+    <div class="msg" id="m0"></div>
+  </section>
+
+  <!-- 1. limits -->
+  <section class="card" id="c1">
+    <h2><span class="step" id="s1">1</span>Your limits</h2>
+    <p class="sub">The only ceilings the tuner respects. Clock offsets have no caps of their own:
+      how far they go depends on voltage, and crashes teach the tuner which combinations to stop trying.
+      Leave a field empty for no limit.</p>
+    <div class="row" id="limitFields"></div>
+    <div class="row" style="margin-top:10px"><button class="primary" id="saveLimits">Save limits</button>
+      <button id="suggestLimits">Fill in suggested for this card</button>
+      <span class="hint" id="suggestHint"></span></div>
+    <details><summary>How they are enforced</summary>
+      <p class="hint"><b>Power:</b> your limit becomes the card's own watt cap on every trial, so it runs
+        at full speed inside your budget. Above stock it <i>raises</i> the card's power limit (up to the card maximum).
+        If the measured average still goes more than 5% over, the run is stopped.<br>
+        <b>Voltage (core and fabric):</b> right after each config is applied (before any load), the tuner reads
+        each rail's effective voltage limit from mVolt+. Above your max, it puts your settings back immediately and
+        skips that config. A limit above stock lets the sweep raise voltage; above 1.15 V the tuner uses mVolt+'s
+        XOC range.<br>
+        Configs that break a limit are never recommended, and are re-tested if you change the limits.</p>
+    </details>
+    <div class="msg" id="m1"></div>
+  </section>
+
+  <!-- 2. GPU -->
+  <section class="card" id="c2">
+    <h2><span class="step" id="s2">2</span>Your GPU</h2>
+    <p class="sub">Every control mVolt+ reports for this card, read without changing anything.
+      Values that differ from the default are highlighted.</p>
+    <p class="hint" id="powerLine" style="margin:-6px 0 12px"></p>
+    <div class="scroll"><table id="knobTable"><thead><tr>
+      <th>Control</th><th>Current</th><th>Default</th><th>Driver range</th><th>Writable</th><th>Notes</th>
+    </tr></thead><tbody></tbody></table></div>
+    <div class="row" style="margin-top:12px">
+      <button id="probe">Check writable controls</button>
+      <span class="hint">Writes each control's <i>current</i> value back to confirm the driver accepts it. Nothing changes.</span>
+    </div>
+    <div class="msg" id="m2"></div>
+  </section>
+
+  <!-- crash log -->
+  <section class="card" id="crashCard" hidden>
+    <h2><span class="step" style="color:var(--bad);border-color:#7f1d1d">!</span>Crash log <span id="crashCounts"></span></h2>
+    <p class="sub"><b>Hard freezes</b> (black screen, fans at max, manual reset) are the dangerous ones: the run stops until you
+      reset the PC. For each, the likely culprits are the settings that went beyond anything that has run clean.
+      The <b>hard-crash guard</b> never applies a config at or beyond all of a freeze's culprit values.
+      Driver resets recover on their own and only rule out configs at least as aggressive in every setting.</p>
+    <div id="guardRules"></div>
+    <div class="scroll"><table id="crashTable"><thead><tr><th>Trial</th><th>When</th><th>What happened</th>
+      <th>Likely culprits</th><th>Config</th></tr></thead><tbody></tbody></table></div>
+  </section>
+
+  <!-- 3. plan -->
+  <section class="card" id="c3">
+    <h2><span class="step" id="s3">3</span>What to test</h2>
+    <div class="tabs">
+      <button class="tab on" data-tab="smart">Smart search <span class="chip ok">recommended</span></button>
+      <button class="tab" data-tab="manual">Manual grid</button>
+    </div>
+
+    <!-- ===== smart search ===== -->
+    <div id="smartPane">
+      <p class="sub">The tuner does the stepping. <b>Explore</b> spreads runs across wide ranges to measure how much
+        each control moves score, watts and stability. <b>Edge search</b> then finds the highest stable core for each
+        power budget and undervolt level by halving the gap between pass and crash. <b>Confirm</b> backs the best
+        off a safety margin and re-runs it several times before anything is recommended.</p>
+      <div class="stages stages3">
+        <label class="stage on" data-stage="explore"><input type="radio" name="stage" value="explore" checked>
+          <b>1 · Explore</b><span id="exploreState">wide spread, ~40 runs</span></label>
+        <label class="stage" data-stage="edge"><input type="radio" name="stage" value="edge">
+          <b>2 · Edge search</b><span id="edgeState">after an explore pass</span></label>
+        <label class="stage" data-stage="confirm"><input type="radio" name="stage" value="confirm">
+          <b>3 · Confirm</b><span id="confirmState">after the edge search</span></label>
+        <label class="stage" data-stage="vdemand"><input type="radio" name="stage" value="vdemand">
+          <b>4 · Sweep one setting</b><span id="vdState">after a confirm</span></label>
+      </div>
+
+      <div id="explorePane">
+        <div class="row">
+          <label class="f">Starting point<select id="sProf"></select><small id="sProfInfo"></small></label>
+          <label class="f">Runs<input type="number" id="sRuns" min="4" max="500" value="40" />
+            <small>more runs = clearer picture</small></label>
+          <label class="f" style="flex-direction:row;display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <input type="checkbox" id="sRef" checked /> also measure the starting point itself</label>
+        </div>
+        <div class="scroll" style="margin-top:12px"><table class="knobs" id="sTable"><thead><tr>
+          <th></th><th>Control</th><th>Explore range (the values applied)</th><th>Step</th><th>vs starting point</th>
+        </tr></thead><tbody></tbody></table></div>
+        <details id="sMore"><summary>More controls to explore (video, voltage demand, boost, current limits…)</summary>
+          <div class="scroll"><table class="knobs" id="sTable2"><tbody></tbody></table></div>
+        </details>
+        <div class="preview" id="sPreview"><span class="hint">loading…</span></div>
+      </div>
+
+      <div id="edgePane" hidden>
+        <div class="row"><button id="analyse">Analyse explore results</button>
+          <span class="hint">How much each control moved score, watts and crash risk - with error bars.</span></div>
+        <div id="analysis" class="preview"><span class="hint">Run an explore pass, then analyse it.</span></div>
+        <h3 class="sect">Edge search plan</h3>
+        <p class="hint">Each <b>lane</b> is one power budget × one undervolt level. In each lane the tuner finds the highest
+          stable core by halving the gap between the highest pass and the lowest crash (one step = 15 MHz). Results are shared:
+          a pass with more voltage or budget counts as a pass with less (deeper undervolt / lower budget); a crash with less
+          voltage counts as a crash with more. On this card a deeper undervolt holds more core, not less.
+          Each lane starts where a crash model fitted to <b>all</b> your runs so far predicts ~10% crash chance,
+          and never jumps more than 2 steps above its highest pass. A crash counts for every budget (they hit seconds into
+          the load, before any cap binds). After <b>2 driver resets in one boot the run stops</b> and asks you to restart
+          Windows: on this card every hard freeze came after repeated resets. Press Start after the restart to resume.</p>
+        <div class="row">
+          <label class="f">Power budgets (W)<input id="eBudgets" style="width:160px" placeholder="300, 260" /></label>
+          <label class="f">Undervolt levels: REL (mV)<input id="eRels" style="width:180px" placeholder="-50, -75, -100" /></label>
+          <label class="f">Core from<input type="number" id="eLo" /></label>
+          <label class="f">to<input type="number" id="eHi" /></label>
+          <label class="f">step<input type="number" id="eStep" value="15" /></label>
+        </div>
+        <div class="hint" style="margin-top:8px">Held at (everything else):</div>
+        <div class="row" id="eHeld"></div>
+        <div class="preview" id="ePreview"><span class="hint">Analyse first to fill in a suggested plan.</span></div>
+        <div id="lanes"></div>
+      </div>
+
+      <div id="confirmPane" hidden>
+        <div class="row">
+          <label class="f">Safety margin below the edge (MHz)<input type="number" id="cMargin" value="15" step="15" /></label>
+          <label class="f">Runs per config<input type="number" id="cRepeats" value="3" min="2" max="20" /></label>
+        </div>
+        <div id="confirmView" class="preview"><span class="hint">Finish the edge search first.</span></div>
+      </div>
+
+      <div id="vdPane" hidden>
+        <p class="hint">REL (the voltage <i>limit</i>) only caps the top of the V/F curve. At a power budget the card runs
+          below that top, where REL does nothing. The <b>core voltage-demand offset</b> lowers the voltage asked for at
+          <i>every</i> clock - fewer watts, or more clock inside a binding budget. It can fail at any clock, so each config
+          walks down from 0 one value at a time (0 is re-measured for a same-session comparison), and the first crash
+          ends that config's lane. The 2-resets-per-boot stop applies as always.</p>
+        <p class="hint">The <b>memory offset</b> sweep steps up from the config's own memory offset the same way:
+          the first value is re-measured as the reference, and the first crash ends the lane.</p>
+        <div class="row">
+          <label class="f">Setting<select id="vdKey"><option value="core_vdemand">Core voltage demand (mV)</option>
+            <option value="mem">Memory offset (MHz)</option></select></label>
+          <label class="f">Values<input id="vdValues" style="width:260px"
+            value="-10, -20, -30, -40, -50, -60, -70, -80" /></label>
+          <label class="f">Runs per value<input type="number" id="vdRepeats" value="2" min="1" max="10" /></label>
+        </div>
+        <div id="vdBases" class="preview"><span class="hint">Confirm some configs first.</span></div>
+        <div id="vdView"></div>
+      </div>
+    </div>
+
+    <!-- ===== manual grid ===== -->
+    <div id="manualPane" hidden>
+    <p class="sub">Step through values yourself. With a profile selected, values are
+      <b>added to the profile's own</b> (e.g. core −50…+50 around test1's +400 tests +350…+450).</p>
+    <div class="row">
+      <label class="f">Starting point<select id="baseProf"></select><small id="baseInfo"></small></label>
+      <label class="f">Configs to run now<input type="number" id="trials" min="1" value="" placeholder="all" />
+        <small id="trialsHint">all of them</small></label>
+      <label class="f" style="flex-direction:row;display:flex;gap:8px;align-items:center;margin-bottom:8px">
+        <input type="checkbox" id="incBase" checked /> also measure your current settings (reference)</label>
+    </div>
+    <div class="scroll" style="margin-top:12px"><table class="knobs" id="planTable"><thead><tr>
+      <th>Control</th><th>Mode</th><th>Values</th><th>Notes</th>
+    </tr></thead><tbody></tbody></table></div>
+    <details id="moreKnobs"><summary>More controls (fabric clocks, voltage demand, boost, current limits…)</summary>
+      <div class="scroll"><table class="knobs" id="planTable2"><tbody></tbody></table></div>
+    </details>
+    <div class="preview" id="preview"><span class="hint">Choose at least one control to vary.</span></div>
+    </div>
+  </section>
+
+  <!-- 4. run -->
+  <section class="card" id="c4">
+    <h2><span class="step" id="s4">4</span>Run</h2>
+    <p class="sub">Each config is applied, benchmarked (<span id="benchName">fullscreen</span>) and checked for driver resets.
+      Your settings are restored at the end or when you press Stop. Leave the PC alone while it runs.</p>
+    <div class="row">
+      <button class="primary" id="start">Start</button>
+      <button class="danger" id="stop" disabled>Stop</button>
+      <label class="f" style="flex-direction:row;display:flex;gap:8px;align-items:center">
+        <input type="checkbox" id="simulate" /> dry run (fake results, no GPU writes)</label>
+    </div>
+    <div class="banner" id="goCheck" hidden style="margin-top:12px">
+      <b>This applies settings to your GPU.</b> Fullscreen benchmarks will run one after another - leave the PC
+      alone (and don't let it sleep) until it finishes. Some configs will crash the driver; that's expected and
+      recorded. Your settings are restored at the end or when you press Stop.
+      <div class="row" style="margin-top:10px"><button class="primary" id="goYes">Yes, start</button>
+        <button id="goNo">Cancel</button></div>
+    </div>
+    <div class="status" id="runStatus"><span><span class="dot"></span>idle</span></div>
+    <div class="msg" id="m4"></div>
+    <pre class="log" id="log" hidden></pre>
+  </section>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmt = v => v === null || v === undefined ? '—' : (typeof v === 'number' ? (Number.isInteger(v) ? v : +v.toFixed(4)) : String(v));
+
+const LABELS = {
+  core:'Core clock offset', mem:'Memory clock offset', xbar_offset:'XBAR clock offset',
+  sys_offset:'SYS clock offset', video_offset:'Video clock offset', rel:'NVVDD REL (core voltage limit)',
+  msvdd_rel:'MSVDD REL (fabric voltage limit)', core_vdemand:'Core voltage demand',
+  xbar_vdemand:'XBAR voltage demand', sys_vdemand:'SYS voltage demand', video_vdemand:'Video voltage demand',
+  power:'Power limit', cap:'Power cap', boost:'Voltage boost', boost_lock:'Boost lock',
+  clock_max:'Max core clock', nvvdd_ocp:'NVVDD current limit', msvdd_ocp:'MSVDD current limit',
+  msvdd_clock_ratio:'MSVDD clock ratio',
+};
+// Controls the limits/power logic owns: your watt limit becomes the cap.
+const NOT_IN_PLAN = new Set(['cap', 'power']);
+// The levers that matter most, shown first; everything else is folded away.
+const PRIMARY = ['core', 'rel', 'mem'];
+
+let TOKEN = null, STATE = null, previewTimer = null, polling = null;
+
+async function api(path, body){
+  const opt = {cache:'no-store'};
+  if (body !== undefined){
+    if (!TOKEN) TOKEN = (await (await fetch('/api/session', opt)).json()).token;
+    Object.assign(opt, {method:'POST', body:JSON.stringify(body),
+      headers:{'Content-Type':'application/json', 'X-Tuner-Token':TOKEN}});
+  }
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(() => ({error:'bad response ('+r.status+')'}));
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+}
+function say(id, text, ok){ const m = $(id); m.textContent = text || ''; m.className = 'msg ' + (text ? (ok ? 'ok' : 'err') : ''); }
+
+/* ---------------- state ---------------- */
+async function loadState(){
+  try { STATE = await api('/api/state'); }
+  catch (e){ $('gpu').textContent = 'server unavailable'; return; }
+  renderTop(); renderLimits(); renderKnobs(); renderPlan(); renderRun(STATE.run);
+  initSmart();
+  loadCrashes();
+}
+
+/* ---------------- crash log ---------------- */
+async function loadCrashes(){
+  let c;
+  try { c = await api('/api/crashes'); } catch (e){ return; }
+  const hard = c.entries.filter(e => e.hard), soft = c.entries.filter(e => !e.hard);
+  $('crashCard').hidden = !c.entries.length;
+  if (!c.entries.length) return;
+  $('crashCounts').innerHTML = (hard.length ? '<span class="chip bad">' + hard.length + ' hard freeze' +
+      (hard.length === 1 ? '' : 's') + '</span> ' : '') +
+    (soft.length ? '<span class="chip warn">' + soft.length + ' recovered</span>' : '');
+  $('guardRules').innerHTML = c.rules.length ? '<div class="banner bad" style="margin-bottom:10px"><b>Guard active:</b> ' +
+    'skipping configs where ' + c.rules.map(r => esc(r.text.replace(/ froze the GPU.*$/, '')) +
+      ' <span class="hint">(trial ' + r.trial + ')</span>').join('; or ') + '</div>' : '';
+  const show = p => Object.entries(p).filter(([k, v]) => !['vmin', 'alt', 'msvdd_vmin', 'msvdd_alt',
+      'msvdd_clock_ratio', 'boost_lock'].includes(k)).map(([k, v]) => k + ' ' + (typeof v === 'number' && v > 0 &&
+      k !== 'cap' ? '+' : '') + fmt(v) + (k === 'cap' ? ' W' : '')).join(' · ');
+  const when = s => s ? new Date(s).toLocaleString([], {month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'}) : '';
+  $('crashTable').querySelector('tbody').innerHTML = c.entries.map(e =>
+    '<tr><td class="m">' + e.id + '</td><td class="hint">' + esc(when(e.when)) + '</td>' +
+    '<td class="' + (e.hard ? 'bad' : 'muted') + '">' + esc(e.label) +
+      (e.driver_errors != null ? ' <span class="hint">· ' + e.driver_errors + ' driver errors before reboot</span>' : '') + '</td>' +
+    '<td class="m">' + (e.hard ? (Object.entries(e.culprits || {}).map(([k, v]) => '<b>' + esc(k) + ' ' +
+      (v.value > 0 ? '+' : '') + fmt(v.value) + '</b> <span class="hint">(clean up to ' +
+      (v.highest_clean == null ? 'never tested' : (v.highest_clean > 0 ? '+' : '') + fmt(v.highest_clean)) +
+      ')</span>').join('<br>') || '<span class="hint">no single setting stands out</span>') : '') + '</td>' +
+    '<td class="hint">' + esc(show(e.params)) + '</td></tr>').join('');
+}
+
+function renderTop(){
+  const s = STATE, b = [];
+  $('gpu').innerHTML = s.gpu ? '<b>' + esc(s.gpu) + '</b> · VBIOS ' + esc(s.vbios) +
+    ' · applied: ' + esc(s.active_profile ?? 'unknown') : esc(s.status_error || 'GPU not readable');
+  if (!s.mvolt) b.push(['bad', 'mVolt+ was not found. ' + esc(s.status_error || '')]);
+  else if (s.status_error) b.push(['bad', 'Could not read the GPU: ' + esc(s.status_error)]);
+  if (!s.elevated) b.push(['', 'This server is not running as Administrator: you can look around and do a dry run, ' +
+    'but applying settings needs an elevated terminal (<code>python -m tuner --serve</code>).']);
+  if (s.app_running) b.push(['', 'mVolt+ is open. That is fine for runs - just don\'t press Apply or switch ' +
+    'profiles in it, and don\'t let the PC sleep, while a run is going (either would change the settings ' +
+    'under the tuner and the trial would be recorded as a driver reset). Close it only to save results as profiles.']);
+  $('banners').innerHTML = b.map(([c, t]) => '<div class="banner ' + c + '">' + t + '</div>').join('');
+}
+
+/* ---------------- 1. limits ---------------- */
+let limitsBuilt = false;
+function renderLimits(){
+  const lim = STATE.limits, specs = STATE.limit_specs || [
+    {key:'max_watts', label:'max board power', unit:'W'},
+    {key:'max_core_mv', label:'max core voltage (NVVDD limit)', unit:'mV'},
+    {key:'max_fabric_mv', label:'max fabric voltage (MSVDD limit)', unit:'mV'}];
+  if (!limitsBuilt){
+    limitsBuilt = true;
+    $('limitFields').innerHTML = specs.map(s =>
+      '<label class="f" style="min-width:230px">' + esc(s.label[0].toUpperCase() + s.label.slice(1)) +
+      ' (' + esc(s.unit) + ')<input type="number" data-limit="' + esc(s.key) + '" min="1" ' +
+      (s.max != null ? 'max="' + esc(s.max) + '" ' : '') + 'step="' + (s.unit === 'W' ? 1 : 5) +
+      '" placeholder="none" value="' + esc(lim && lim[s.key] != null ? lim[s.key] : '') + '" />' +
+      '<small>' + (s.stock != null ? 'stock <b>' + esc(fmt(s.stock)) + ' ' + esc(s.unit) + '</b>' : '') +
+      (s.max != null ? ' · max ' + esc(fmt(s.max)) + ' ' + esc(s.unit) : '') +
+      (s.standard_max != null ? ' (above ' + esc(fmt(s.standard_max)) + ' uses XOC)' : '') + '</small>' +
+      '<small class="vs" data-vs="' + esc(s.key) + '"></small></label>').join('');
+    for (const inp of document.querySelectorAll('[data-limit]')) inp.addEventListener('input', () => compareStock(specs));
+    compareStock(specs);
+    $('suggestHint').textContent = 'the full power range, core +50 mV over stock, fabric at stock - review, then Save';
+    $('suggestLimits').onclick = () => {
+      for (const s of specs){
+        const inp = document.querySelector('[data-limit="' + s.key + '"]');
+        inp.value = s.suggested != null ? s.suggested : '';
+      }
+      compareStock(specs);
+      say('m1', 'Filled in - press Save limits to use them.', true);
+    };
+  }
+  const done = !!lim;
+  $('s1').className = 'step' + (done ? ' done' : ''); $('s1').textContent = done ? '✓' : '1';
+  for (const id of ['c2', 'c3', 'c4']) $(id).classList.toggle('locked', !done);
+  if (done && !$('m1').textContent) say('m1', 'Saved: ' + limText(lim), true);
+}
+function compareStock(specs){
+  for (const s of specs){
+    const v = document.querySelector('[data-limit="' + s.key + '"]').value;
+    const el = document.querySelector('[data-vs="' + s.key + '"]');
+    if (v === '' || s.stock == null){ el.textContent = v === '' ? 'no limit' : ''; el.style.color = 'var(--tx3)'; continue; }
+    const d = Number(v) - s.stock;
+    el.textContent = d > 0 ? '▲ ' + fmt(d) + ' ' + s.unit + ' above stock - allows raising it' :
+                     d < 0 ? '▼ ' + fmt(-d) + ' ' + s.unit + ' below stock - every config must stay under it' :
+                     '= stock';
+    el.style.color = d > 0 ? 'var(--warn)' : d < 0 ? 'var(--cy)' : 'var(--tx3)';
+  }
+}
+function limText(l){
+  const f = (v, u) => v != null ? v + ' ' + u : 'none';
+  return 'power ' + f(l.max_watts, 'W') + ' · core ' + f(l.max_core_mv, 'mV') +
+         ' · fabric ' + f(l.max_fabric_mv, 'mV');
+}
+$('saveLimits').onclick = async () => {
+  const body = {};
+  for (const inp of document.querySelectorAll('[data-limit]')) body[inp.dataset.limit] = inp.value;
+  try {
+    const out = await api('/api/limits', body);
+    say('m1', 'Saved: ' + limText(out.limits), true);
+    await loadState(); schedulePreview();
+  } catch (e){ say('m1', e.message); }
+};
+
+/* ---------------- 2. GPU ---------------- */
+function renderKnobs(){
+  const rows = STATE.knobs || [];
+  $('knobTable').querySelector('tbody').innerHTML = rows.map(k => {
+    const w = k.writable === true ? '<span class="chip ok">yes</span>' : k.writable === false ?
+      '<span class="chip bad">no</span>' : '<span class="chip">not checked</span>';
+    const changed = k.default !== null && k.default !== undefined && k.current !== null &&
+                    String(k.current) !== String(k.default);
+    return '<tr class="' + (k.available ? '' : 'off') + '"><td>' + esc(LABELS[k.key] || k.key) +
+      ' <span class="hint">' + esc(k.key) + '</span></td>' +
+      '<td class="m"' + (changed ? ' style="color:var(--warn)"' : '') + '>' + esc(fmt(k.current)) + ' ' + esc(k.unit) + '</td>' +
+      '<td class="m" title="' + esc(k.default_note || '') + '">' +
+        (k.default === null || k.default === undefined ? '<span class="hint">not reported</span>' :
+         esc(fmt(k.default)) + ' ' + esc(k.unit)) + '</td>' +
+      '<td class="m">' + (k.bounds ? esc(fmt(k.bounds[0])) + ' … ' + esc(fmt(k.bounds[1])) : '—') + '</td>' +
+      '<td>' + (k.available ? w : '—') + '</td>' +
+      '<td class="hint">' + esc(k.available ? k.note : k.reason) + '</td></tr>';
+  }).join('') + (STATE.profile_only || []).map(p =>
+      '<tr><td>' + esc(p.label) + '</td><td class="m">—</td>' +
+      '<td class="m" title="stored in profile ' + esc(p.profile) + '">' + esc(fmt(p.value)) + ' ' + esc(p.unit) +
+      (p.aux != null ? ' <span class="hint">(aux ' + esc(fmt(p.aux)) + ')</span>' : '') + '</td><td>—</td>' +
+      '<td><span class="chip">profile only</span></td><td class="hint">' + esc(p.note) + '</td></tr>').join('')
+    || '<tr><td colspan="6" class="hint">No GPU data.</td></tr>';
+  const pw = STATE.power || {}, rails = STATE.rails || {};
+  $('powerLine').innerHTML = pw.default_w ? 'Power: stock <b>' + fmt(pw.default_w) + ' W</b>, card range ' +
+      fmt(pw.min_w) + '–' + fmt(pw.max_w) + ' W (' + (pw.percent_range || []).join('–') + '%) · ' +
+      ['core', 'fabric'].filter(r => rails[r]).map(r => r[0].toUpperCase() + r.slice(1) + ' voltage limit: now <b>' +
+        fmt(rails[r].current_mv) + ' mV</b>, stock ' + fmt(rails[r].stock_mv) + ' mV, max ' +
+        fmt(rails[r].standard_max_mv) + ' (XOC ' + fmt(rails[r].xoc_max_mv) + ') mV').join(' · ') : '';
+  $('s2').className = 'step' + (STATE.probed ? ' done' : '');
+  $('s2').textContent = STATE.probed ? '✓' : '2';
+}
+$('probe').onclick = async () => {
+  $('probe').disabled = true; say('m2', 'checking… (writes each current value back)', true);
+  try { await api('/api/probe', {}); say('m2', 'Done - see the Writable column.', true); await loadState(); }
+  catch (e){ say('m2', e.message); }
+  finally { $('probe').disabled = false; }
+};
+
+/* ---------------- 3. plan ---------------- */
+let planBuilt = false;
+function profileParams(name){
+  const p = (STATE.profiles || []).find(p => p.name === name || p.id === name);
+  return p ? p.params : null;
+}
+function defaultSpec(key, relative){
+  if (key === 'core') return relative ? {mode:'sweep', min:-50, max:50, step:25} : {mode:'sweep', min:0, max:200, step:50};
+  if (key === 'rel') return relative ? {mode:'off', min:-25, max:0, step:25} : {mode:'off', min:-100, max:0, step:25};
+  if (key === 'mem') return relative ? {mode:'off', min:-500, max:0, step:250} : {mode:'off', min:0, max:1000, step:500};
+  return {mode:'off', min:0, max:0, step:1, value:0};
+}
+function renderPlan(){
+  if (planBuilt) return;           // keep what the user typed across refreshes
+  planBuilt = true;
+  const saved = STATE.plan || {};
+  const sel = $('baseProf');
+  sel.innerHTML = '<option value="">Current settings</option>' +
+    (STATE.profiles || []).map(p => '<option value="' + esc(p.name) + '">Profile: ' + esc(p.name) + '</option>').join('');
+  sel.value = saved.baseline_profile ?? ((STATE.profiles || [])[0]?.name || '');
+  // empty = all configs in the plan; an old saved number would silently cap a new plan
+  if (saved.include_baseline !== undefined && saved.include_baseline !== null) $('incBase').checked = !!saved.include_baseline;
+  buildKnobRows(saved.knobs || null);
+  sel.onchange = () => { buildKnobRows(null); schedulePreview(); };
+  for (const id of ['trials', 'incBase']){ $(id).onchange = schedulePreview; $(id).oninput = schedulePreview; }
+  schedulePreview();
+}
+function buildKnobRows(savedKnobs){
+  const relative = !!$('baseProf').value;
+  const base = profileParams($('baseProf').value) || {};
+  $('baseInfo').textContent = relative ? Object.entries(base).filter(([k, v]) => v)
+      .map(([k, v]) => k + ' ' + v).join(' · ') : 'whatever the card is running now';
+  const rows = (STATE.knobs || []).filter(k => k.available && k.writable !== false && !NOT_IN_PLAN.has(k.key));
+  const rowHtml = k => {
+    const s = Object.assign(defaultSpec(k.key, relative), (savedKnobs || {})[k.key] || {});
+    const isBool = k.key === 'boost_lock';
+    const baseV = base[k.key];
+    const note = relative && baseV !== undefined ? 'profile: ' + fmt(baseV) + ' ' + k.unit + ' (values are added)' :
+                 (k.bounds ? 'driver: ' + fmt(k.bounds[0]) + '…' + fmt(k.bounds[1]) + ' ' + k.unit : '');
+    return '<tr data-key="' + esc(k.key) + '" data-unit="' + esc(k.unit) + '"' +
+      (relative && typeof baseV === 'number' ? ' data-base="' + esc(baseV) + '"' : '') +
+      ' data-note="' + esc(note) + '"><td>' + esc(LABELS[k.key] || k.key) + '</td>' +
+      '<td><select class="mode">' +
+        ['off', isBool ? null : 'sweep', 'fixed'].filter(Boolean).map(m =>
+          '<option' + (s.mode === m ? ' selected' : '') + '>' + m + '</option>').join('') +
+      '</select></td><td class="inputs">' +
+      (isBool ? '<span class="v-fixed"><select class="value"><option value="false">off</option>' +
+                '<option value="true"' + (s.value ? ' selected' : '') + '>on</option></select></span>' :
+        '<span class="v-sweep">from <input type="number" class="min" value="' + esc(s.min) + '"> to ' +
+        '<input type="number" class="max" value="' + esc(s.max) + '"> step ' +
+        '<input type="number" class="stepv" value="' + esc(s.step) + '"></span>' +
+        '<span class="v-fixed"><input type="number" class="value" value="' + esc(s.value ?? 0) + '"></span>') +
+      ' <span>' + esc(k.unit) + '</span></td><td class="hint">' + esc(note) + '</td></tr>';
+  };
+  const primary = rows.filter(k => PRIMARY.includes(k.key))
+                      .sort((a, b) => PRIMARY.indexOf(a.key) - PRIMARY.indexOf(b.key));
+  const rest = rows.filter(k => !PRIMARY.includes(k.key));
+  $('planTable').querySelector('tbody').innerHTML = primary.map(rowHtml).join('');
+  $('planTable2').querySelector('tbody').innerHTML = rest.map(rowHtml).join('');
+  // open the fold if a saved plan uses one of the advanced controls
+  $('moreKnobs').open = rest.some(k => ((savedKnobs || {})[k.key] || {}).mode &&
+                                       savedKnobs[k.key].mode !== 'off');
+  for (const tr of planRows()){
+    const sync = () => {
+      const m = tr.querySelector('.mode').value;
+      tr.classList.toggle('off', m === 'off');
+      const sw = tr.querySelector('.v-sweep'), fx = tr.querySelector('.v-fixed');
+      if (sw) sw.hidden = m !== 'sweep';
+      if (fx) fx.hidden = m !== 'fixed';
+      tr.cells[3].innerHTML = resolvedNote(tr, m);
+    };
+    sync();
+    tr.addEventListener('input', () => { sync(); schedulePreview(); });
+    tr.addEventListener('change', () => { sync(); schedulePreview(); });
+  }
+}
+/* The values that will actually be applied, e.g. "tests +350, +375, +400, +425, +450 MHz"
+   for core -50..50 step 25 on top of a +400 profile. */
+function resolvedNote(tr, mode){
+  const note = esc(tr.dataset.note || ''), unit = tr.dataset.unit || '';
+  const base = tr.dataset.base !== undefined ? Number(tr.dataset.base) : 0;
+  const sign = v => (v > 0 && unit !== 'ratio' && unit !== 'A' && unit !== '%' ? '+' : '') + fmt(+v.toFixed(3));
+  let vals = null;
+  if (mode === 'sweep'){
+    const lo = Number(tr.querySelector('.min').value), hi = Number(tr.querySelector('.max').value),
+          st = Number(tr.querySelector('.stepv').value);
+    if (!isFinite(lo) || !isFinite(hi) || !(st > 0)) return note;
+    vals = [];
+    for (let v = Math.min(lo, hi); v <= Math.max(lo, hi) + 1e-9 && vals.length < 200; v += st) vals.push(v + base);
+  } else if (mode === 'fixed'){
+    const el = tr.querySelector('input.value');
+    if (!el) return note;
+    vals = [Number(el.value) + base];
+  }
+  if (!vals || !vals.length) return note;
+  const shown = vals.length > 7 ? vals.slice(0, 3).map(sign).join(', ') + ' … ' + sign(vals[vals.length - 1]) +
+                ' (' + vals.length + ' values)' : vals.map(sign).join(', ');
+  return '<b style="color:var(--tx)">tests ' + esc(shown) + ' ' + esc(unit) + '</b>' +
+         (note ? '<br>' + note : '');
+}
+function planRows(){ return document.querySelectorAll('#planTable tbody tr, #planTable2 tbody tr'); }
+function planBody(){
+  const knobs = {};
+  for (const tr of planRows()){
+    const key = tr.dataset.key, mode = tr.querySelector('.mode').value;
+    const spec = {mode};
+    if (mode === 'sweep'){
+      spec.min = tr.querySelector('.min').value; spec.max = tr.querySelector('.max').value;
+      spec.step = tr.querySelector('.stepv').value;
+    } else if (mode === 'fixed'){
+      const v = tr.querySelector('.value').value;
+      spec.value = key === 'boost_lock' ? v === 'true' : v;
+    }
+    knobs[key] = spec;
+  }
+  return {baseline_profile:$('baseProf').value, knobs, trials:Number($('trials').value) || 0,
+          include_baseline:$('incBase').checked, simulate:$('simulate').checked};
+}
+function schedulePreview(){ clearTimeout(previewTimer); previewTimer = setTimeout(doPreview, 350); }
+async function doPreview(){
+  if (!STATE || !STATE.limits) return;
+  try {
+    const p = await api('/api/plan/preview', planBody());
+    const keys = [...new Set(p.sample.flatMap(o => Object.keys(o)))]
+      .filter(k => !['vmin', 'alt', 'msvdd_vmin', 'msvdd_alt'].includes(k));
+    const t = $('trials'), asked = Number(t.value) || 0;
+    t.max = p.count;
+    const now = asked > 0 ? Math.min(asked, p.count) : p.count;
+    $('trialsHint').textContent = asked > p.count ? 'only ' + p.count + ' exist - running all' :
+      asked > 0 && asked < p.count ? 'first ' + now + ' of ' + p.count + '; the rest next time' :
+      'all ' + p.count;
+    const ref = $('incBase').checked ? 1 : 0, runs = now + ref;
+    const plural = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');
+    $('preview').innerHTML = '<div class="big">' + plural(p.count, 'config') +
+      (now < p.count ? ' <span class="hint">(running ' + now + ' now)</span>' : '') +
+      '</div><div class="hint" style="margin:2px 0 8px">' +
+      (ref ? plural(now, 'config') + ' + 1 reference = <b>' + plural(runs, 'benchmark run') + '</b>'
+           : '<b>' + plural(runs, 'benchmark run') + '</b>') +
+      ' · about ' + Math.round(runs * 1.6) + ' min</div>' +
+      '<div class="scroll"><table><thead><tr>' + keys.map(k => '<th>' + esc(k) + '</th>').join('') +
+      '</tr></thead><tbody>' + p.sample.map(o => '<tr>' + keys.map(k =>
+        '<td class="m">' + esc(fmt(o[k])) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' +
+      (p.count > p.sample.length ? '<div class="hint">… and ' + (p.count - p.sample.length) + ' more</div>' : '') +
+      '<div class="hint">Your power limit is added as a watt cap when the run starts. ' +
+      'Configs already measured under the same limits are skipped.</div>';
+    $('s3').className = 'step done'; $('s3').textContent = '✓';
+  } catch (e){
+    $('preview').innerHTML = '<span class="msg err">' + esc(e.message) + '</span>';
+    $('s3').className = 'step'; $('s3').textContent = '3';
+  }
+}
+
+/* ---------------- 4. run ---------------- */
+/* ---------------- 3a. smart search ---------------- */
+let MODE = 'explore';                 // 'explore' | 'edge' | 'confirm' | 'vdemand' | 'grid'
+const SMART = {start: {}, selection: {}, built: false, search: null, analysis: null, edgeEst: null};
+const S_PRIMARY = ['core', 'mem', 'rel', 'xbar_offset', 'sys_offset', 'cap'];
+
+function setMode(m){
+  MODE = m;
+  const smart = m !== 'grid';
+  $('smartPane').hidden = !smart; $('manualPane').hidden = smart;
+  for (const t of document.querySelectorAll('.tab')) t.classList.toggle('on', (t.dataset.tab === 'smart') === smart);
+  $('explorePane').hidden = m !== 'explore'; $('edgePane').hidden = m !== 'edge';
+  $('confirmPane').hidden = m !== 'confirm';
+  if (m === 'confirm') renderConfirm();
+  $('vdPane').hidden = m !== 'vdemand';
+  if (m === 'vdemand') renderVd();
+  for (const s of document.querySelectorAll('.stage')) s.classList.toggle('on', s.dataset.stage === m);
+  if (smart) document.querySelector('input[name=stage][value=' + m + ']').checked = true;
+  updateStartLabel();
+}
+for (const t of document.querySelectorAll('.tab'))
+  t.onclick = () => setMode(t.dataset.tab === 'manual' ? 'grid' :
+                            (document.querySelector('input[name=stage]:checked').value));
+for (const r of document.querySelectorAll('input[name=stage]')) r.onchange = () => setMode(r.value);
+
+function updateStartLabel(){
+  const seed = (SMART.search || {}).seed;
+  const cands = seed || ((SMART.search || {}).edge || {}).candidates || [];
+  $('start').textContent =
+    MODE === 'explore' ? 'Start explore (' + (Number($('sRuns').value) || 0) + ' runs)' :
+    MODE === 'edge' ? 'Start edge search' + (SMART.edgeEst ? ' (≤' + SMART.edgeEst + ' runs)' : '') :
+    MODE === 'confirm' ? 'Start ' + (seed ? 'measuring the Kombustor front' : 'confirm') + ' (' + cands.length * (Number($('cRepeats').value) || 0) + ' runs)' :
+    MODE === 'vdemand' ? 'Start ' + ($('vdKey').value === 'mem' ? 'memory' : 'voltage-demand') + ' sweep (≤' + vdEstimate() + ' runs)' :
+    'Start grid';
+}
+
+async function initSmart(){
+  if (SMART.built || !STATE || !STATE.limits || !STATE.knobs) return;
+  SMART.built = true;
+  const sel = $('sProf');
+  sel.innerHTML = (STATE.profiles || []).map(p => '<option value="' + esc(p.name) + '">Profile: ' + esc(p.name) + '</option>').join('') +
+    '<option value="">Current settings</option>';
+  sel.onchange = loadSmartDefaults;
+  for (const id of ['sRuns', 'sRef']){ $(id).oninput = () => { updateStartLabel(); scheduleSmart(); }; }
+  for (const id of ['eBudgets', 'eRels', 'eLo', 'eHi', 'eStep']) $(id).oninput = scheduleEdge;
+  for (const id of ['cMargin', 'cRepeats']) $(id).oninput = () => { updateStartLabel(); renderConfirm(); };
+  for (const id of ['vdValues', 'vdRepeats']) $(id).oninput = updateStartLabel;
+  $('vdKey').onchange = () => {
+    $('vdValues').value = $('vdKey').value === 'mem' ? '2300, 2600, 2900' : '-10, -20, -30, -40, -50, -60, -70, -80';
+    updateStartLabel();
+  };
+  await loadSmartDefaults();
+  await loadSearchStatus();
+}
+
+async function loadSmartDefaults(){
+  try {
+    const d = await api('/api/search/defaults', {profile: $('sProf').value});
+    SMART.start = d.start; SMART.selection = d.selection;
+    $('sProfInfo').textContent = Object.entries(d.start).filter(([k, v]) => v)
+      .map(([k, v]) => k + ' ' + fmt(v)).join(' · ') || 'stock offsets';
+    renderSmart(); scheduleSmart();
+  } catch (e){ $('sPreview').innerHTML = '<span class="msg err">' + esc(e.message) + '</span>'; }
+}
+
+// Ranges are typed as the values that will actually be applied (absolute).
+// Typing them relative to the starting profile made "-100 to +600" around a
+// +400 profile mean +300..+1000 - which crashed a real run.
+const startOf = key => Number(SMART.start[key] || 0);
+function renderSmart(){
+  const row = key => {
+    const s = SMART.selection[key], absKey = !!s.absolute;
+    const base = absKey ? 0 : startOf(key);
+    const unit = key === 'cap' ? 'W' : ((STATE.knobs || []).find(k => k.key === key) || {}).unit || '';
+    const label = key === 'cap' ? 'Power budget (watt cap)' : (LABELS[key] || key);
+    const v = x => +(Number(x) + base).toFixed(3);
+    return '<tr data-key="' + esc(key) + '" data-unit="' + esc(unit) + '"' + (absKey ? ' data-abs="1"' : '') + '>' +
+      '<td><input type="checkbox" class="on"' + (s.on ? ' checked' : '') + '></td>' +
+      '<td>' + esc(label) + '</td><td class="inputs">' +
+      '<input type="number" class="lo" value="' + esc(v(s.lo)) + '"><span>to</span>' +
+      '<input type="number" class="hi" value="' + esc(v(s.hi)) + '"><span>' + esc(unit) + '</span></td>' +
+      '<td><input type="number" class="step" value="' + esc(s.step) + '"></td><td class="hint abs"></td></tr>';
+  };
+  const keys = Object.keys(SMART.selection);
+  $('sTable').querySelector('tbody').innerHTML = keys.filter(k => S_PRIMARY.includes(k))
+    .sort((a, b) => S_PRIMARY.indexOf(a) - S_PRIMARY.indexOf(b)).map(row).join('');
+  $('sTable2').querySelector('tbody').innerHTML = keys.filter(k => !S_PRIMARY.includes(k)).map(row).join('');
+  for (const tr of document.querySelectorAll('#sTable tbody tr, #sTable2 tbody tr')){
+    const sync = () => {
+      tr.classList.toggle('off', !tr.querySelector('.on').checked);
+      if (tr.dataset.abs) return;
+      const base = startOf(tr.dataset.key);
+      const lo = Number(tr.querySelector('.lo').value), hi = Number(tr.querySelector('.hi').value);
+      const rel = x => (x - base > 0 ? '+' : '') + fmt(+(x - base).toFixed(3));
+      tr.querySelector('.abs').textContent = 'start ' + fmt(base) + ' · ' + rel(lo) + ' … ' + rel(hi);
+    };
+    sync();
+    tr.addEventListener('input', () => { sync(); scheduleSmart(); });
+    tr.addEventListener('change', () => { sync(); scheduleSmart(); });
+  }
+}
+
+function smartBody(){
+  const selection = {};
+  for (const tr of document.querySelectorAll('#sTable tbody tr, #sTable2 tbody tr')){
+    // The inputs hold absolute values; the server takes spans relative to start.
+    const base = tr.dataset.abs ? 0 : startOf(tr.dataset.key);
+    selection[tr.dataset.key] = {on: tr.querySelector('.on').checked,
+      lo: Number(tr.querySelector('.lo').value) - base, hi: Number(tr.querySelector('.hi').value) - base,
+      step: Number(tr.querySelector('.step').value), absolute: !!tr.dataset.abs};
+  }
+  return {mode:'explore', profile:$('sProf').value, selection, runs:Number($('sRuns').value) || 30,
+          include_baseline:$('sRef').checked, simulate:$('simulate').checked};
+}
+
+let smartTimer = null;
+function scheduleSmart(){ clearTimeout(smartTimer); smartTimer = setTimeout(previewSmart, 350); }
+async function previewSmart(){
+  try {
+    const p = await api('/api/search/plan', smartBody());
+    const dims = p.space.dims;
+    $('sPreview').innerHTML = '<div class="big">' + p.count + ' runs across ' + Object.keys(dims).length +
+      ' controls <span class="hint">· about ' + p.estimate_min + ' min</span></div>' +
+      '<div class="hint" style="margin:4px 0 8px">Searched (absolute): ' + Object.entries(dims).map(([k, d]) =>
+        '<b>' + esc(k) + '</b> ' + fmt(d.lo) + '…' + fmt(d.hi)).join(' · ') + '</div>' +
+      (p.notes.length ? '<div class="hint" style="color:var(--warn)">' + p.notes.map(esc).join('<br>') + '</div>' : '') +
+      (p.guarded ? '<div class="hint" style="color:var(--bad)"><b>' + p.guarded + ' of these will be skipped</b> by the ' +
+        'hard-crash guard (see Crash log): ' + p.guard_rules.map(esc).join('; ') + '</div>' : '') +
+      '<div class="scroll"><table><thead><tr>' + Object.keys(dims).map(k => '<th>' + esc(k) + '</th>').join('') +
+      '</tr></thead><tbody>' + p.sample.map(o => '<tr>' + Object.keys(dims).map(k =>
+        '<td class="m">' + esc(fmt(o[k])) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div>' +
+      '<div class="hint">First ' + p.sample.length + ' of ' + p.count + ' spread-out configs. Crashes here are expected ' +
+      'and useful: they map where each control stops being stable. Controls you leave unticked stay at the starting value.</div>';
+    $('s3').className = 'step done'; $('s3').textContent = '✓';
+  } catch (e){
+    $('sPreview').innerHTML = '<span class="msg err">' + esc(e.message) + '</span>';
+  }
+}
+
+async function loadSearchStatus(){
+  try { SMART.search = await api('/api/search'); } catch (e){ return; }
+  const ex = SMART.search.explore, ed = SMART.search.edge, cf = SMART.search.confirm;
+  $('exploreState').textContent = ex ? 'last pass: ' + ex.done + ' of ' + ex.runs + ' runs done' +
+    (ex.profile ? ' around ' + ex.profile : '') : 'wide spread, ~40 runs';
+  const exReady = ex && ex.done >= 8;
+  document.querySelector('.stage[data-stage=edge]').classList.toggle('disabled', !exReady);
+  $('edgeState').textContent = ed ? ed.done + ' of ' + ed.total + ' lanes have found their edge' :
+    exReady ? 'ready - analyse the explore results' : (ex ? 'needs at least 8 explore runs' : 'after an explore pass');
+  const seed = SMART.search.seed || null;
+  const cReady = (ed && (ed.candidates || []).length > 0) || !!seed;
+  document.querySelector('.stage[data-stage=confirm]').classList.toggle('disabled', !cReady);
+  const confirmed = cf ? cf.results.filter(r => r.verdict === 'confirmed').length : 0;
+  $('confirmState').textContent = cf ? confirmed + ' of ' + cf.results.length + ' configs confirmed' :
+    seed ? seed.length + ' starting configs from Kombustor' :
+    cReady ? (ed.candidates.length + ' candidate' + (ed.candidates.length === 1 ? '' : 's') + ' ready') :
+    'after the edge search';
+  const vd = SMART.search.vdemand, vdb = SMART.search.vdemand_bases || [];
+  document.querySelector('.stage[data-stage=vdemand]').classList.toggle('disabled', !vdb.length && !vd);
+  $('vdState').textContent = vd ? vd.lanes.filter(l => l.done).length + ' of ' + vd.lanes.length + ' configs done' :
+    vdb.length ? vdb.length + ' confirmed config' + (vdb.length === 1 ? '' : 's') + ' to try' : 'after a confirm';
+  renderLanes();
+  if (MODE === 'confirm') renderConfirm();
+  if (MODE === 'vdemand') renderVd();
+  updateStartLabel();
+}
+
+/* ----- analysis: effects with error bars, crash trade-off ----- */
+$('analyse').onclick = async () => {
+  $('analyse').disabled = true; $('analysis').innerHTML = '<span class="hint">analysing…</span>';
+  try { SMART.analysis = await api('/api/search/analysis'); renderAnalysis(); fillEdgeForm(SMART.analysis.suggested_edge); }
+  catch (e){ $('analysis').innerHTML = '<span class="msg err">' + esc(e.message) + '</span>'; }
+  finally { $('analyse').disabled = false; }
+};
+
+function renderAnalysis(){
+  const a = SMART.analysis.analysis, ef = a.effects, cr = a.crash;
+  const sign = v => (v > 0 ? '+' : '') + fmt(v);
+  const cell = (e, unit) => !e ? '<td class="muted">—</td>' :
+    '<td class="m ' + (e.clear ? '' : 'muted') + '">' + sign(e.per_unit) + ' ' + unit +
+    ' <span class="hint">± ' + fmt(e.se) + '</span></td>';
+  const name = k => k === 'cap' ? 'power budget' : (LABELS[k] || k);
+  const crashBy = Object.fromEntries((cr.knobs || []).map(k => [k.knob, k]));
+  let html = '<div class="big">What each control does <span class="hint">· ' + ef.n + ' clean runs of ' +
+             SMART.analysis.explore_runs + '</span></div>';
+  if (ef.note) html += '<div class="hint">' + esc(ef.note) + '</div>';
+  if ((ef.knobs || []).length){
+    html += '<div class="scroll"><table><thead><tr><th>Control</th><th>Per</th><th>Score</th><th>Watts</th>' +
+      '<th>Across the explored range</th><th>Crash risk</th></tr></thead><tbody>' +
+      ef.knobs.map(k => '<tr><td>' + esc(name(k.knob)) + '</td><td class="m">+' + fmt(k.per) + ' ' + esc(k.unit) + '</td>' +
+        cell(k.score, 'pts') + cell(k.watts, 'W') +
+        '<td class="m">' + (k.score ? sign(k.score.across_range) + ' pts' : '—') +
+        (k.watts ? ' · ' + sign(k.watts.across_range) + ' W' : '') + '</td>' +
+        '<td class="hint">' + esc((crashBy[k.knob] || {}).effect || '') + '</td></tr>').join('') +
+      '</tbody></table></div>' +
+      '<div class="hint">Grey = within the noise (less than 2 standard errors). Fit: score R² ' +
+        fmt((ef.fit.score || {}).r2) + ', run-to-run noise ±' + fmt((ef.fit.score || {}).noise_sd) + ' pts.</div>';
+  }
+  html += '<div style="margin-top:8px"><b>Stability:</b> ' + cr.crashes + ' of ' + cr.n + ' runs crashed' +
+    (cr.tradeoff ? ' · <b style="color:var(--warn)">' + esc(cr.tradeoff) + '</b>' : (cr.note ? ' · ' + esc(cr.note) : '')) + '</div>';
+  $('analysis').innerHTML = html;
+}
+
+/* ----- edge-search plan ----- */
+function fillEdgeForm(plan){
+  if (!plan) return;
+  $('eBudgets').value = plan.budgets.join(', ');
+  $('eRels').value = plan.rels.join(', ');
+  $('eLo').value = plan.core.lo; $('eHi').value = plan.core.hi; $('eStep').value = plan.core.step;
+  $('eHeld').innerHTML = Object.entries(plan.base).filter(([k]) => !['vmin', 'msvdd_vmin', 'msvdd_alt'].includes(k))
+    .map(([k, v]) => '<label class="f">' + esc(LABELS[k] || k) +
+      '<input type="number" data-held="' + esc(k) + '" value="' + esc(v) + '"></label>').join('');
+  for (const i of document.querySelectorAll('[data-held]')) i.oninput = scheduleEdge;
+  scheduleEdge();
+}
+function edgeBody(){
+  const held = {};
+  for (const i of document.querySelectorAll('[data-held]')) held[i.dataset.held] = i.value;
+  return {mode:'edge', budgets:$('eBudgets').value, rels:$('eRels').value,
+          core:{lo:$('eLo').value, hi:$('eHi').value, step:$('eStep').value}, held,
+          simulate:$('simulate').checked};
+}
+let edgeTimer = null;
+function scheduleEdge(){ clearTimeout(edgeTimer); edgeTimer = setTimeout(previewEdge, 350); }
+async function previewEdge(){
+  if (!$('eLo').value) return;
+  try {
+    const p = await api('/api/search/edge-preview', edgeBody());
+    SMART.edgeEst = p.estimate_runs;
+    $('ePreview').innerHTML = '<div class="big">' + p.lanes + ' lanes <span class="hint">· at most ' + p.estimate_runs +
+      ' runs, about ' + Math.round(p.estimate_runs * 1.6) + ' min (usually fewer: lanes share results)</span></div>' +
+      '<div class="hint">Budgets ' + p.plan.budgets.map(b => fmt(b) + ' W').join(', ') + ' × REL ' +
+      p.plan.rels.map(r => fmt(r) + ' mV').join(', ') + ' · core ' + fmt(p.plan.core.lo) + '…' + fmt(p.plan.core.hi) +
+      ' in ' + fmt(p.plan.core.step) + ' MHz steps.</div>';
+  } catch (e){ SMART.edgeEst = null; $('ePreview').innerHTML = '<span class="msg err">' + esc(e.message) + '</span>'; }
+  updateStartLabel();
+}
+function renderLanes(){
+  const ed = (SMART.search || {}).edge;
+  if (!ed){ $('lanes').innerHTML = ''; return; }
+  if (!SMART.analysis && !$('eLo').value) fillEdgeForm(ed.plan);
+  $('lanes').innerHTML = '<h3 class="sect">Lanes</h3><div class="scroll"><table><thead><tr><th>Budget</th><th>REL</th>' +
+    '<th title="Where the crash model (all runs so far) puts 10% / 50% / 90% crash chance">Model 10/50/90%</th>' +
+    '<th>Highest pass</th><th>Lowest crash</th><th>Status</th><th>Runs</th></tr></thead><tbody>' +
+    ed.lanes.map(l => '<tr><td class="m">' + fmt(l.cap) + ' W</td><td class="m">' + fmt(l.rel) + ' mV</td>' +
+      '<td class="m muted">' + (l.prior ? '+' + l.prior.p10 + ' / +' + l.prior.p50 + ' / +' + l.prior.p90 : '—') + '</td>' +
+      '<td class="m good">' + (l.lo != null ? '+' + fmt(l.lo) : '—') + '</td>' +
+      '<td class="m bad">' + (l.hi != null ? '+' + fmt(l.hi) : '—') + '</td>' +
+      '<td>' + (l.done ? '<span class="chip ok">' + esc(l.note || 'done') + '</span>' :
+                 '<span class="hint">next: core +' + fmt(l.next) + '</span>') + '</td>' +
+      '<td class="m">' + l.runs + '</td></tr>').join('') + '</tbody></table></div>';
+}
+
+/* ----- confirm ----- */
+function renderConfirm(){
+  const s = SMART.search || {}, cands = (s.edge || {}).candidates || [], cf = s.confirm;
+  if (!cf && s.seed){
+    $('confirmView').innerHTML = '<div class="big">Starting configs <span class="hint">· Kombustor\'s clean Pareto front ' +
+      'and your reference profile. Only the configs carry over: each is measured here from scratch, ' +
+      'the runs interleaved. The safety margin does not apply (these are exact configs).</span></div>' +
+      '<div class="scroll"><table><thead><tr><th>Pick</th><th>Budget</th><th>REL</th><th>Core</th><th>Mem</th>' +
+      '<th>Kombustor (not used)</th></tr></thead><tbody>' + s.seed.map(c => '<tr><td>' + esc(c.pick || '') +
+      '</td><td class="m">' + fmt(c.cap) + ' W</td><td class="m">' + fmt(c.rel) + ' mV</td><td class="m">+' + fmt(c.core) +
+      '</td><td class="m">+' + fmt(c.params.mem || 0) + '</td><td class="m muted">' +
+      (c.src_score != null ? fmt(c.src_score) + ' @ ' + fmt(c.src_watts) + ' W' : '') + '</td></tr>').join('') +
+      '</tbody></table></div>';
+    // ~3 min per GravityMark pass: 2 runs per config unless you change it.
+    if (!SMART.seedRepeatsSet){ $('cRepeats').value = 2; SMART.seedRepeatsSet = true; }
+    updateStartLabel();
+    return;
+  }
+  const margin = Number($('cMargin').value) || 0;
+  if (cf && cf.results.length){
+    $('confirmView').innerHTML = '<div class="big">Confirmation</div><div class="scroll"><table><thead><tr>' +
+      '<th>Budget</th><th>REL</th><th>Core</th><th>Runs</th><th>Score</th><th>Watts</th><th>Verdict</th></tr></thead><tbody>' +
+      cf.results.map(r => '<tr><td class="m">' + fmt(r.cap) + ' W</td><td class="m">' + fmt(r.rel) + ' mV</td>' +
+        '<td class="m">+' + fmt(r.core) + ' <span class="hint">' + (r.edge != null ? '(edge +' + fmt(r.edge) + ')' : '(' + esc(r.pick || 'reference') + ')') + '</span></td><td class="m">' + r.runs + '</td>' +
+        '<td class="m">' + (r.score_mean != null ? fmt(Math.round(r.score_mean)) + (r.score_sd != null ? ' <span class="hint">± ' +
+          fmt(Math.round(r.score_sd)) + '</span>' : '') : '—') + '</td>' +
+        '<td class="m">' + (r.watts_mean != null ? fmt(+r.watts_mean.toFixed(1)) : '—') + '</td>' +
+        '<td class="' + (r.crashes ? 'bad' : r.verdict === 'confirmed' ? 'good' : 'muted') + '">' + esc(r.verdict) + '</td></tr>').join('') +
+      '</tbody></table></div><div class="hint">Confirmed configs appear on the Results page and can be saved as mVolt+ profiles there. ' +
+      'If one failed, raise the margin and confirm again. ' +
+      'Candidates sit 1 margin below their lane edge, and up to 2 more steps lower where the crash model says the edge was a lucky pass.</div>';
+    return;
+  }
+  $('confirmView').innerHTML = cands.length ? '<div class="big">Candidates <span class="hint">· ' +
+      'efficiency = most core per budget (usually the deepest undervolt); performance = best measured score at the top budget; reference = your starting profile, measured the same way; ' +
+      fmt(margin) + ' MHz below the edge</span></div><div class="scroll"><table><thead><tr><th>Pick</th><th>Budget</th><th>REL</th>' +
+      '<th>Edge</th><th>Will run at</th></tr></thead><tbody>' + cands.map(c => '<tr><td>' + esc(c.pick || '') + '</td><td class="m">' + fmt(c.cap) +
+      ' W</td><td class="m">' + fmt(c.rel) + ' mV</td><td class="m">' + (c.edge != null ? '+' + fmt(c.edge) : '—') + '</td><td class="m">+' +
+      fmt(c.edge != null ? Math.max(Math.min(c.core, c.edge - margin), 0) : c.core) + '</td></tr>').join('') + '</tbody></table></div>' :
+    '<span class="hint">Finish the edge search first.</span>';
+}
+/* ----- voltage demand ----- */
+function vdValues(){
+  const mem = $('vdKey').value === 'mem';
+  return $('vdValues').value.split(/[ ,;]+/).filter(x => x !== '').map(Number)
+    .filter(v => isFinite(v) && (mem ? v > 0 : v < 0));
+}
+function vdEstimate(){
+  const n = document.querySelectorAll('.vdPick:checked').length;
+  return n * (vdValues().length + 1) * (Number($('vdRepeats').value) || 0);
+}
+function renderVd(){
+  const s = SMART.search || {}, bases = s.vdemand_bases || [], vd = s.vdemand;
+  const U = vd && vd.plan.key === 'mem' ? ' MHz' : ' mV';
+  const was = new Set([...document.querySelectorAll('.vdPick')].filter(c => c.checked).map(c => +c.value));
+  const fresh = !document.querySelector('.vdPick');
+  $('vdBases').innerHTML = bases.length ? '<div class="big">Confirmed configs <span class="hint">· tick the ones to sweep</span></div>' +
+    '<div class="scroll"><table><thead><tr><th></th><th>Pick</th><th>Budget</th><th>REL</th><th>Core</th><th>Mem</th><th>Score</th><th>Watts</th></tr></thead><tbody>' +
+    bases.map(b => '<tr><td><input type="checkbox" class="vdPick" value="' + b.index + '"' +
+      ((fresh ? b.default : was.has(b.index)) ? ' checked' : '') + '></td><td>' + esc(b.pick || '') + '</td><td class="m">' + fmt(b.cap) +
+      ' W</td><td class="m">' + fmt(b.rel) + ' mV</td><td class="m">+' + fmt(b.core) + '</td><td class="m">' + (b.mem != null ? '+' + fmt(b.mem) : '—') + '</td><td class="m">' +
+      (b.score_mean != null ? fmt(Math.round(b.score_mean)) : '—') + '</td><td class="m">' +
+      (b.watts_mean != null ? fmt(+b.watts_mean.toFixed(1)) : '—') + '</td></tr>').join('') + '</tbody></table></div>' :
+    '<span class="hint">Confirm some configs first.</span>';
+  for (const c of document.querySelectorAll('.vdPick')) c.onchange = updateStartLabel;
+  $('vdView').innerHTML = vd ? '<h3 class="sect">Sweep results <span class="hint">· ' + (vd.plan.key === 'mem' ? 'memory offset' : 'core voltage demand') +
+      ' · Δ is against the first value' +
+      (vd.remaining ? ' · up to ' + vd.remaining + ' runs left' : '') + '</span></h3>' +
+    vd.lanes.map(l => '<div class="hint" style="margin-top:10px"><b>' + esc(l.label) + '</b> · ' +
+      (l.crashed_at != null ? '<span class="bad">crashed at ' + fmt(l.crashed_at) + U + '</span> · ' : '') +
+      (l.edge != null ? 'furthest clean: <b>' + fmt(l.edge) + U + '</b>' : 'nothing clean yet') +
+      (l.done || !l.next ? '' : ' · next: ' + fmt(l.next.value) + U) + '</div>' +
+      '<div class="scroll"><table><thead><tr><th>Value</th><th>Runs</th><th>Score</th><th>Δ score</th><th>Watts</th><th>Δ watts</th><th>Clock</th></tr></thead><tbody>' +
+      l.rows.map(r => '<tr><td class="m">' + fmt(r.value) + U + '</td><td class="m">' + r.runs +
+        (r.crashes ? ' <span class="bad">(' + r.crashes + ' crash)</span>' : '') + '</td>' +
+        '<td class="m">' + (r.score_mean != null ? fmt(Math.round(r.score_mean)) : '—') + '</td>' +
+        '<td class="m">' + (r.d_score != null ? (r.d_score >= 0 ? '+' : '') + fmt(Math.round(r.d_score)) : '') + '</td>' +
+        '<td class="m">' + (r.watts_mean != null ? fmt(+r.watts_mean.toFixed(1)) : '—') + '</td>' +
+        '<td class="m">' + (r.d_watts != null ? (r.d_watts >= 0 ? '+' : '') + fmt(+r.d_watts.toFixed(1)) : '') + '</td>' +
+        '<td class="m">' + (r.clk_mean != null ? fmt(Math.round(r.clk_mean)) + ' MHz' : '—') + '</td></tr>').join('') +
+      '</tbody></table></div>').join('') : '';
+  updateStartLabel();
+}
+function vdBody(){
+  return {mode:'vdemand', key:$('vdKey').value, bases:[...document.querySelectorAll('.vdPick:checked')].map(c => +c.value),
+          values:vdValues(), repeats:Number($('vdRepeats').value) || 2, simulate:$('simulate').checked};
+}
+
+function confirmBody(){
+  return {mode:(SMART.search || {}).seed ? 'seed' : 'confirm', margin:Number($('cMargin').value) || 0, repeats:Number($('cRepeats').value) || 3,
+          simulate:$('simulate').checked};
+}
+
+$('start').onclick = async () => {
+  say('m4', '');
+  if (MODE === 'edge' && !$('eLo').value){ say('m4', 'Press "Analyse explore results" first.'); return; }
+  // No window.confirm(): embedded browsers (e.g. the Claude app's pane) suppress
+  // it silently, which made Start look dead. Confirm on the page instead.
+  if (!$('simulate').checked){
+    $('goCheck').hidden = false;
+    $('goCheck').scrollIntoView({block: 'nearest'});
+    return;
+  }
+  await launch();
+};
+$('goNo').onclick = () => { $('goCheck').hidden = true; };
+$('goYes').onclick = async () => { $('goCheck').hidden = true; await launch(); };
+async function launch(){
+  const body = MODE === 'explore' ? smartBody() : MODE === 'edge' ? edgeBody() :
+               MODE === 'confirm' ? confirmBody() : MODE === 'vdemand' ? vdBody() : Object.assign(planBody(), {mode:'grid'});
+  $('start').disabled = true;
+  try { renderRun(await api('/api/run', body)); poll(); }
+  catch (e){ say('m4', e.message); $('start').disabled = false; }
+};
+$('stop').onclick = async () => {
+  try { renderRun(await api('/api/run/stop', {})); say('m4', 'Stopping after the current step, then restoring your settings…', true); }
+  catch (e){ say('m4', e.message); }
+};
+function renderRun(r){
+  if (!r) return;
+  const hb = r.heartbeat || {};
+  const live = r.running ? '<span><span class="dot run"></span>running' + (r.source === 'terminal' ? ' (started from a terminal)' : '') + '</span>' +
+      (hb.trial ? '<span>trial <b>#' + esc(hb.trial) + '</b> · ' + esc(hb.phase) + '</span>' : '') +
+      (r.stopping ? '<span class="chip warn">stopping…</span>' : '')
+    : '<span><span class="dot"></span>' + (r.exit_code === null || r.exit_code === undefined ? 'idle' :
+        'finished (exit ' + esc(r.exit_code) + ')') + '</span>' +
+      (r.exit_code !== null && r.exit_code !== undefined ? '<a href="/web/index.html" style="color:var(--cy)">see results →</a>' : '');
+  $('runStatus').innerHTML = live;
+  $('start').disabled = r.running; $('stop').disabled = !r.running || r.stopping;
+  const lg = $('log');
+  if (r.log && r.log.length){
+    const atEnd = lg.scrollTop + lg.clientHeight >= lg.scrollHeight - 20;
+    lg.hidden = false; lg.textContent = r.log.join('\n');
+    if (atEnd) lg.scrollTop = lg.scrollHeight;
+  }
+  $('s4').className = 'step' + (r.running ? '' : (r.exit_code === 0 ? ' done' : ''));
+}
+let wasRunning = false;
+async function poll(){
+  clearTimeout(polling);
+  try {
+    const r = await api('/api/run'); renderRun(r);
+    if (r.running || wasRunning) loadSearchStatus();   // progress while running, final count after
+    if (wasRunning && !r.running) loadCrashes();
+    wasRunning = r.running;
+    polling = setTimeout(poll, r.running ? 2000 : 8000);
+  } catch (e){ polling = setTimeout(poll, 8000); }
+}
+
+setMode('explore');
+/* ---------------- benchmark ---------------- */
+const BENCH_RUNTIME = {kombustor: '~60 s fullscreen Kombustor', gravitymark: '~3 min fullscreen GravityMark Direct3D 11 pass'};
+async function loadBench(){
+  try {
+    const b = await api('/api/bench');
+    const sel = $('benchTool');
+    sel.innerHTML = Object.entries(b.tools).map(([k, v]) => '<option value="' + esc(k) + '"' +
+      (k === b.tool ? ' selected' : '') + (b.installed[k] ? '' : ' disabled') + '>' + esc(v) +
+      (b.installed[k] ? '' : ' - not installed') + '</option>').join('');
+    $('benchName').textContent = BENCH_RUNTIME[b.tool] || b.tool;
+    $('benchHint').textContent = (b.runs[b.tool] || 0) + ' runs recorded with this benchmark. ' +
+      'Each benchmark is its own study (scores are not comparable across them); ' +
+      'hard freezes and driver resets count across both.';
+    sel.onchange = async () => {
+      sel.disabled = true;
+      try { await api('/api/bench', {tool: sel.value}); location.reload(); }
+      catch (e){ say('m0', e.message); sel.value = b.tool; sel.disabled = false; }
+    };
+  } catch (e){ say('m0', e.message); }
+}
+loadBench();
+loadState().then(poll);
+</script>
+</body>
+</html>

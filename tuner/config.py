@@ -8,6 +8,7 @@ Environment overrides (checked first):
     MVOLT_EXE        full path to mVolt+.exe
     KOMBUSTOR_EXE    full path to MSI-Kombustor-x64.exe
     KOMBUSTOR_DIR    directory containing MSI-Kombustor-x64.exe
+    GRAVITYMARK_EXE  full path to GravityMark.exe
 """
 from __future__ import annotations
 
@@ -27,6 +28,8 @@ BOOT_STATE = DATA / "boot-state.json"
 JOURNAL_DB = STATE / "journal.db"
 EVENTS = STATE / "events.jsonl"
 LIVE_JSON = DATA / "live.json"
+STOP_FLAG = DATA / "stop.flag"      # created by the web UI's Stop button
+RUN_LOG = DATA / "run.log"          # output of a run started from the web UI
 RECOMMENDATION_JSON = DATA / "recommendation.json"
 
 # Trial protocol (overridable from config.json)
@@ -37,13 +40,18 @@ BENCH_ARGS = [
 BENCH_TIMEOUT_S = 240
 HEARTBEAT_INTERVAL_S = 2.0
 MAX_CONSECUTIVE_BOOTS_WITHOUT_PROGRESS = 3
+# Driver resets pile up: on the reference RTX 5080 three of four hard freezes
+# (black screen, manual reset) came right after 2+ driver resets in the same
+# boot (23-26 NVIDIA driver errors logged first). After this many unstable runs
+# since boot the run stops and asks for a Windows restart; Start resumes it.
+MAX_RESETS_PER_BOOT = 2
+RESET_COOLDOWN_S = 30   # idle time after a driver reset before the next apply
 
-# Hard ceiling on automatically applied offsets. Evidence from the reference
-# machine (RTX 2060 mobile): +1000 wedged the driver and OS, +300 hung once,
-# +250 hung during apply, +200 completed, +150 is the optimum.
-MAX_AUTO_CORE_MHZ = 200
-VERIFIED_CORE_MHZ = 150
-MAX_AUTO_MEM_MHZ = 1200
+# Top of the default core sweep when no range is given (`--max-core`). This is a
+# starting range, NOT a limit: the tuner imposes no ceilings of its own. The only
+# bounds are the ranges the driver reports through mVolt+ (which mVolt+ enforces
+# anyway), plus configs learned to be unstable from this machine's own crashes.
+DEFAULT_SWEEP_CORE_MHZ = 200
 
 
 class DependencyMissing(RuntimeError):
@@ -72,6 +80,8 @@ def mvolt_path() -> Path:
     candidates: list[Path] = [
         ROOT / "mVolt+.exe",              # dropped into the project folder
         ROOT.parent / "mVolt+.exe",       # kept alongside the project folder
+        ROOT.parent.parent / "mVolt+.exe",
+        Path(os.environ.get("USERPROFILE", "")) / "Downloads" / "mVolt+.exe",  # the download is a bare exe
         Path(os.environ.get("ProgramFiles", "C:/Program Files")) / "mVolt+" / "mVolt+.exe",
         Path(os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")) / "mVolt+" / "mVolt+.exe",
         Path(os.environ.get("LOCALAPPDATA", "")) / "Programs" / "mVolt+" / "mVolt+.exe",
@@ -132,3 +142,61 @@ def kombustor_log() -> Path:
 
 def kombustor_logs_dir() -> Path:
     return kombustor_dir() / "logs"
+
+
+# ---- which benchmark ----------------------------------------------------
+# Each benchmark scores in its own units, so each keeps its own journal (its
+# results, plans and restore point). Hard freezes and driver resets are
+# hardware events, not benchmark ones: those are read across every journal.
+BENCH_TOOLS = {
+    "kombustor": "MSI Kombustor (furry donut, OpenGL)",
+    "gravitymark": "GravityMark (Direct3D 11)",
+}
+DEFAULT_BENCH_TOOL = "kombustor"
+GRAVITYMARK_ARGS = [
+    "-d3d11", "-benchmark", "1", "-close", "1", "-fullscreen", "1", "-screen", "0",
+    "-temporal", "1", "-fps", "1", "-info", "1", "-sensors", "1",
+]
+GRAVITYMARK_TIMEOUT_S = 330   # a pass renders ~167 s; load and exit add a few
+
+
+def bench_tool() -> str:
+    """The benchmark selected in state/config.json (bench.tool)."""
+    import json
+    try:
+        saved = json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
+        tool = ((saved or {}).get("bench") or {}).get("tool")
+    except Exception:
+        tool = None
+    return tool if tool in BENCH_TOOLS else DEFAULT_BENCH_TOOL
+
+
+def journal_db(tool: str | None = None, dry: bool = False) -> Path:
+    """Kombustor keeps the original file names, so its history is unchanged."""
+    tool = tool or bench_tool()
+    stem = "journal" if tool == "kombustor" else f"journal-{tool}"
+    return STATE / f"{stem}{'-dryrun' if dry else ''}.db"
+
+
+def bench_defaults(tool: str) -> dict:
+    if tool == "gravitymark":
+        return {"tool": tool, "args": list(GRAVITYMARK_ARGS),
+                "timeout_s": GRAVITYMARK_TIMEOUT_S, "nvsmi_index": 0}
+    return {"tool": "kombustor", "args": list(BENCH_ARGS),
+            "timeout_s": BENCH_TIMEOUT_S, "nvsmi_index": 0}
+
+
+def gravitymark_exe() -> Path:
+    env = _env_path("GRAVITYMARK_EXE")
+    if env and env.is_file():
+        return env
+    for base in (os.environ.get("ProgramFiles", "C:/Program Files"),
+                 os.environ.get("ProgramFiles(x86)", "C:/Program Files (x86)")):
+        p = Path(base) / "GravityMark" / "bin" / "GravityMark.exe"
+        if p.is_file():
+            return p
+    raise DependencyMissing(
+        "GravityMark was not found.\n"
+        "  Download: https://gravitymark.tellusim.com/\n"
+        "  Install it, or set GRAVITYMARK_EXE=C:\path\to\GravityMark\bin\GravityMark.exe"
+    )

@@ -1,0 +1,66 @@
+V:      0 us: Windows::main(): started
+M:   1.34 ms: ../data.zip: 313 files
+M:   3.09 ms: Fullscreen mode
+M:   3.11 ms: Temporal antialiasing
+M:   3.12 ms: Render Statistics
+M:   5.79 ms: Build Date: May 17 2025
+M:   5.82 ms: Build Info: version=20250429; windows; x64; release; d3d12=6; d3d11=2; vk=1; gl=45; cu=1; fusion
+M:   5.83 ms: Build Version: 1.89
+M: 157.40 ms: Name: <motherboard>
+M: 157.46 ms: System: Microsoft Windows 11 Pro
+M: 157.47 ms: Kernel: 10.0.26300
+M: 157.48 ms: Memory: 31.19 GB
+M: 157.49 ms: Uptime: <uptime>
+M: 157.50 ms: CPU: <cpu>
+M: 157.58 ms: GPU 0: NVIDIA GeForce RTX 5080
+M: 157.59 ms: Device: PCI\VEN_10DE&DEV_2C02&SUBSYS_1432196E&REV_A1\<instance>
+M: 157.60 ms: Version: 621.24
+M: 157.60 ms: Memory: 15.92 GB
+M: 157.61 ms: Screens: 2
+M: 157.61 ms: GPU 1: Virtual Desktop Monitor
+M: 157.62 ms: Device: ROOT\DISPLAY\<instance>
+M: 157.62 ms: Version: 13.50.53.699
+M: 157.63 ms: GPU 2: Meta Virtual Monitor
+M: 157.63 ms: Device: ROOT\DISPLAY\<instance>
+M: 157.64 ms: Version: 5.3.57.114
+M: 157.64 ms: GPU 3: AMD Radeon(TM) Graphics
+M: 157.65 ms: Device: PCI\VEN_1002&DEV_13C0&SUBSYS_88771043&REV_E6\<instance>
+M: 157.65 ms: Version: 25.10.42-260323a-200157C-Channel
+M: 157.66 ms: Memory: 512.00 MB
+M: 223.45 ms: Desktop: 3440x1440 1.0
+M: 223.49 ms: Screen 0: 3440x1440 0 0 \\.\DISPLAY1 NVIDIA GeForce RTX 5080
+M: 223.49 ms: Set fullscreen mode on 0 screen
+M: 224.85 ms: Creating 3440x1440 Direct3D11 Window
+M: 404.50 ms: Render Size: 3440x1440
+M: 404.57 ms: Using Fetch Mode
+M: 439.46 ms: Device: NVIDIA GeForce RTX 5080
+M: 439.49 ms: Vendor: Nvidia
+M: 439.49 ms: DeviceID: 0x2c02
+M: 439.51 ms: Video Memory: 15.60 GB
+M: 439.51 ms: Creating SceneManager
+M: 524.97 ms: Creating RenderManager
+M: 611.93 ms: Rasterization Mode
+M: 611.96 ms: Creating Scene
+M:   1.453 s: Creating 200,000 Asteroids
+M:   1.515 s: Updating Scene
+M:   1.618 s: GravityMark 1.89 Direct3D11 is Ready in 1.6 s
+M:   1.619 s: Starting 3440x1440 Direct3D11 Benchmark
+M:   1.619 s: Close when finished
+M:   1.619 s: Times: C:/tuner/data/gravitymark-times.txt
+M:   1.619 s: Count: 1
+M:   1.624 s: Resizing 3440x1440 frame
+M:  2:48.661: Benchmark Finished
+M:  2:48.671: Times: C:/tuner/data/gravitymark-times.txt
+M:  2:48.671: NVIDIA GeForce RTX 5080
+M:  2:48.671: API: Direct3D11
+M:  2:48.671: Platform: Windows
+M:  2:48.671: Resolution: 3440x1440
+M:  2:48.671: Antialiasing: Temporal
+M:  2:48.671: Asteroids: 200,000
+M:  2:48.671: Score: 19394
+M:  2:48.671: Time: 167.0 s
+M:  2:48.671: FPS: 116.1
+M:  2:48.679: Clearing Scene
+M:  2:48.786: GravityMark 1.89 Done
+M:  2:48.786: Restore fullscreen mode on 0 screen
+V:  2:48.858: Windows::main(): finished

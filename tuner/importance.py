@@ -75,7 +75,9 @@ def knob_effects(trials: list[dict[str, Any]],
 
     out = []
     for key in sorted(keys):
-        values = [(int((t.get("params") or {}).get(key) or 0), t) for t in usable]
+        # float, not int: REL accepts fractional mV (e.g. -12.5) and int() would
+        # merge distinct levels.
+        values = [(float((t.get("params") or {}).get(key) or 0), t) for t in usable]
         distinct = sorted({v for v, _ in values})
 
         entry: dict[str, Any] = {

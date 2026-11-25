@@ -22,7 +22,10 @@ classifiers = [
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["ruff", "pytest"]
+dev = ["ruff", "pytest", "optuna>=4,<5", "scikit-learn>=1.3"]
+# Optional, secondary importance view (fANOVA shares) on the importance page.
+# The tuner itself - explore, effects, edge search, confirm - needs neither.
+report = ["optuna>=4,<5", "scikit-learn>=1.3"]
 
 [project.scripts]
 mvolt-tuner = "tuner.orchestrator:main"

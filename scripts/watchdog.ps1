@@ -60,6 +60,16 @@ if ($age -lt $StaleSeconds) { exit 0 }
 
 W ("STALE heartbeat: {0}s old (threshold {1}s)" -f $age, $StaleSeconds)
 
+# guard 2b: a tuner that is simply gone (window closed, killed) left the flag
+# behind. The OS is fine, so rebooting would only destroy the user's work.
+$tunerPid = 0
+try { $tunerPid = [int]$hbObj.pid } catch {}
+if ($tunerPid -gt 0 -and -not (Get-Process -Id $tunerPid -ErrorAction SilentlyContinue)) {
+    W ("tuner process {0} is not running - disarming instead of rebooting" -f $tunerPid)
+    Remove-Item $Armed -Force -ErrorAction SilentlyContinue
+    exit 0
+}
+
 # guard 3: reboot budget
 if ($st.reboots -ge $MaxCrashes) {
     $st.disarmed = $true

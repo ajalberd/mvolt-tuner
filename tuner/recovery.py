@@ -16,46 +16,19 @@ which makes the GPU look un-tunable. The release command is:
 
     mVolt+.exe --clock-range default
 
-This module detects the stale lease and releases it before a run starts.
+This module releases the lease. It is called only when an apply is refused with
+the "safety marker" error, so a clock-range lock the user set on purpose is left
+alone. Lease files are never deleted by hand.
 """
 from __future__ import annotations
 
-import glob
-import json
 import os
-import shutil
 from pathlib import Path
-from typing import Any
 
 from . import mvolt
 
 MVOLT_DATA = Path(os.environ.get("LOCALAPPDATA", "")) / "mVolt+"
 LEASE_GLOB = "clock-range-lease-*.json*"
-
-
-def _pid_alive(pid: int | None) -> bool:
-    if not pid:
-        return False
-    try:
-        os.kill(int(pid), 0)
-        return True
-    except (OSError, ValueError):
-        return False
-
-
-def find_stale_leases() -> list[Path]:
-    out: list[Path] = []
-    for path in glob.glob(str(MVOLT_DATA / LEASE_GLOB)):
-        p = Path(path)
-        try:
-            data = json.loads(p.read_text(encoding="utf-8"))
-        except Exception:
-            out.append(p)          # unreadable counts as stale
-            continue
-        pid = data.get("pid")
-        if not _pid_alive(pid):
-            out.append(p)
-    return out
 
 
 def force_release(attempts: int = 10, gap_s: float = 5.0, log=print) -> bool:
@@ -87,31 +60,3 @@ def force_release(attempts: int = 10, gap_s: float = 5.0, log=print) -> bool:
             log(f"lease release failed after {i} attempt(s): {msg[:140]}")
             return False
     return False
-
-
-def clear_stale_lease(backup_dir: Path, log=print) -> bool:
-    """Release a stale clock-range lease. Returns True if it acted."""
-    stale = find_stale_leases()
-    if not stale:
-        return False
-
-    log(f"stale clock-range lease found: {len(stale)} file(s)")
-    backup_dir.mkdir(parents=True, exist_ok=True)
-    for p in stale:
-        try:
-            shutil.copy2(p, backup_dir / p.name)
-        except Exception:
-            pass
-
-    try:
-        mvolt.apply(["--clock-range", "default"])
-        log("released stale lease with --clock-range default")
-        return True
-    except Exception as exc:
-        log(f"WARNING: lease release failed ({exc}); removing files")
-        for p in stale:
-            try:
-                p.unlink()
-            except Exception:
-                pass
-        return True

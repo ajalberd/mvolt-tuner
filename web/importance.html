@@ -40,6 +40,15 @@
   .untested{margin-top:18px;font-size:11.5px;color:var(--tx3)}
   .untested code{font-family:var(--mono);color:var(--tx2);background:#0f1620;
                  padding:1px 5px;border-radius:4px;margin-right:5px}
+  .sect{font-size:12px;font-weight:650;margin:22px 0 6px;color:var(--tx2)}
+  .sect span{font-weight:400;color:var(--tx3);font-family:var(--mono);font-size:11px;margin-left:6px}
+  .cols4{grid-template-columns:repeat(4,1fr)}
+  @media (max-width:1100px){.cols4{grid-template-columns:1fr 1fr}}
+  @media (max-width:600px){.cols4{grid-template-columns:1fr}}
+  .bar.e > i{background:linear-gradient(90deg,#047857,#34d399)}
+  .bar.c > i{background:linear-gradient(90deg,#991b1b,#f87171)}
+  .trend{font-family:var(--mono);font-size:10.5px;color:var(--tx3);margin-top:3px}
+  .trend b{color:var(--tx2);font-weight:600}
   footer{padding:14px 20px;color:var(--tx3);font-size:11px;border-top:1px solid var(--line);margin-top:22px}
 </style>
 </head>
@@ -51,12 +60,24 @@
     <div class="sub" id="sub">loading…</div>
   </div>
   <nav>
-    <a href="/">← Trials</a>
+    <a href="/web/run.html">Setup &amp; Run</a>
+    <a href="/web/index.html">Results</a>
   </nav>
 </header>
 
 <main>
   <p class="note" id="note"></p>
+  <h3 class="sect">What each control does <span id="efInfo"></span></h3>
+  <p class="note">Change in score and watts per step of each control, from a model fitted to the clean runs.
+    Grey values are within the run-to-run noise (less than 2 standard errors) - treat them as "no clear effect".</p>
+  <div class="card" style="margin-bottom:14px"><div id="effects"><div class="empty">loading…</div></div>
+    <div id="stability" style="margin-top:10px;font-size:12.5px"></div></div>
+  <h3 class="sect">Optuna fANOVA (secondary) <span id="optEngine"></span></h3>
+  <p class="note">Importance shares depend on how wide each control was explored, and only count runs that did not
+    crash - use the effects above for decisions.</p>
+  <p class="note" id="optNote"></p>
+  <div class="cols cols4" id="optCards"></div>
+  <h3 class="sect">η² per knob (one-way, repeated levels only)</h3>
   <div class="cols">
     <section class="card">
       <h2>Effect on score</h2>
@@ -95,10 +116,70 @@ function renderList(host, knobs, outcome, cls){
   }).join('');
 }
 
+const esc = s => String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const OPT_CARDS = [
+  ['score', 'Score', '', 'raises score', 'lowers score'],
+  ['watts', 'Wattage', 'w', 'adds watts', 'saves watts'],
+  ['efficiency', 'Efficiency (pts/W)', 'e', 'more efficient', 'less efficient'],
+  ['instability', 'Stability risk', 'c', 'more crashes', 'fewer crashes'],
+];
+function renderOptuna(o){
+  const host = document.getElementById('optCards');
+  if (!o || !o.available){
+    document.getElementById('optNote').textContent = (o && o.note) || 'Optuna report unavailable';
+    host.innerHTML = '';
+    return;
+  }
+  document.getElementById('optEngine').textContent = o.engine + ' · ' + o.trials + ' trials';
+  document.getElementById('optNote').textContent = o.note +
+    (o.not_varied && o.not_varied.length ? '  Not varied: ' + o.not_varied.join(', ') + '.' : '');
+  host.innerHTML = OPT_CARDS.map(([key, title, cls, up, down]) => {
+    const t = (o.targets || {})[key] || {knobs: []};
+    const body = !t.knobs.length
+      ? '<div class="empty">' + esc(t.note || 'no data yet') + '</div>'
+      : t.knobs.map(k => {
+          const imp = k.importance || 0;
+          const r = k.trend_r;
+          const dir = (r == null || imp < 0.05) ? '' : r > 0.2 ? up : r < -0.2 ? down : 'no clear direction';
+          return '<div class="row"><div class="lab"><span class="knob">' + esc(k.knob) + '</span>' +
+            '<span class="val">' + fmt(k.importance, 2) +
+            (k.pedanova != null ? ' · ped ' + fmt(k.pedanova, 2) : '') + '</span></div>' +
+            '<div class="bar ' + cls + '"><i style="width:' + Math.max(imp * 100, 1.5) + '%"></i></div>' +
+            '<div class="trend">r=' + fmt(r, 2) + (dir ? ' · <b>' + dir + '</b>' : '') + '</div></div>';
+        }).join('') + (t.note ? '<div class="empty">' + esc(t.note) + '</div>' : '');
+    return '<section class="card"><h2>' + title + ' · n=' + (t.n || 0) + '</h2>' + body + '</section>';
+  }).join('');
+}
+
+function renderEffects(a){
+  const host = document.getElementById('effects');
+  if (!a){ host.innerHTML = '<div class="empty">no analysis</div>'; return; }
+  const ef = a.effects, cr = a.crash;
+  document.getElementById('efInfo').textContent = ef.n + ' clean runs' +
+    (ef.fit && ef.fit.score ? ' · noise ±' + ef.fit.score.noise_sd + ' pts · R² ' + ef.fit.score.r2 : '');
+  const sign = v => (v > 0 ? '+' : '') + v;
+  const cell = (e, u) => !e ? '<td>—</td>' : '<td style="font-family:var(--mono);' +
+    (e.clear ? '' : 'color:var(--tx3)') + '">' + sign(e.per_unit) + ' ' + u + ' <span style="color:var(--tx3)">± ' +
+    e.se + '</span></td>';
+  host.innerHTML = ef.note && !(ef.knobs || []).length ? '<div class="empty">' + esc(ef.note) + '</div>' :
+    '<table style="width:100%;border-collapse:collapse;font-size:12.5px"><thead><tr style="color:var(--tx3);text-align:left">' +
+    '<th>Control</th><th>Per</th><th>Score</th><th>Watts</th><th>Across explored range</th></tr></thead><tbody>' +
+    (ef.knobs || []).map(k => '<tr><td style="font-family:var(--mono)">' + esc(k.knob) + '</td><td>+' + k.per + ' ' +
+      esc(k.unit) + '</td>' + cell(k.score, 'pts') + cell(k.watts, 'W') + '<td style="font-family:var(--mono)">' +
+      (k.score ? sign(k.score.across_range) + ' pts' : '') + (k.watts ? ' · ' + sign(k.watts.across_range) + ' W' : '') +
+      '</td></tr>').join('') + '</tbody></table>';
+  document.getElementById('stability').innerHTML = '<b>Stability:</b> ' + cr.crashes + ' of ' + cr.n + ' runs crashed' +
+    (cr.tradeoff ? ' · <b style="color:var(--warn)">' + esc(cr.tradeoff) + '</b>' : '') +
+    ((cr.knobs || []).length ? ' · ' + cr.knobs.filter(k => k.clear)
+      .map(k => esc(k.knob) + ' ' + esc(k.effect)).join(', ') : '');
+}
+
 async function load(){
   try{
     const r = await fetch('/api/importance', {cache: 'no-store'});
     const j = await r.json();
+    renderEffects(j.analysis);
+    renderOptuna(j.optuna);
     document.getElementById('sub').textContent =
       j.trials ? j.trials + ' scored trials' : 'no trials yet';
     document.getElementById('note').textContent = j.note || '';

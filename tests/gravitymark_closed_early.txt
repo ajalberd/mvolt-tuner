@@ -1,0 +1,56 @@
+V:      0 us: Windows::main(): started
+M:   3.00 ms: ../data.zip: 313 files
+M:   6.27 ms: Temporal antialiasing
+M:   7.99 ms: Fullscreen mode
+M:   9.70 ms: Render Statistics
+M:  13.69 ms: Build Date: May 17 2025
+M:  15.40 ms: Build Info: version=20250429; windows; x64; release; d3d12=6; d3d11=2; vk=1; gl=45; cu=1; fusion
+M:  17.16 ms: Build Version: 1.89
+M: 166.70 ms: Name: <motherboard>
+M: 169.56 ms: System: Microsoft Windows 11 Pro
+M: 174.11 ms: Kernel: 10.0.26300
+M: 175.83 ms: Memory: 31.19 GB
+M: 177.52 ms: Uptime: <uptime>
+M: 179.22 ms: CPU: <cpu>
+M: 180.93 ms: GPU 0: NVIDIA GeForce RTX 5080
+M: 182.63 ms: Device: PCI\VEN_10DE&DEV_2C02&SUBSYS_1432196E&REV_A1\<instance>
+M: 182.83 ms: Version: 621.24
+M: 182.89 ms: Memory: 15.92 GB
+M: 182.94 ms: Screens: 2
+M: 183.03 ms: GPU 1: Virtual Desktop Monitor
+M: 183.15 ms: Device: ROOT\DISPLAY\<instance>
+M: 183.22 ms: Version: 13.50.53.699
+M: 183.28 ms: GPU 2: Meta Virtual Monitor
+M: 183.41 ms: Device: ROOT\DISPLAY\<instance>
+M: 183.50 ms: Version: 5.3.57.114
+M: 183.56 ms: GPU 3: AMD Radeon(TM) Graphics
+M: 183.60 ms: Device: PCI\VEN_1002&DEV_13C0&SUBSYS_88771043&REV_E6\<instance>
+M: 183.66 ms: Version: 25.10.42-260323a-200157C-Channel
+M: 183.80 ms: Memory: 512.00 MB
+M: 222.71 ms: Desktop: 3440x1440 1.0
+M: 224.01 ms: Screen 0: 3440x1440 0 0 \\.\DISPLAY1 NVIDIA GeForce RTX 5080
+M: 224.15 ms: Set fullscreen mode on 0 screen
+M: 225.12 ms: Creating 3440x1440 Direct3D11 Window
+M: 460.31 ms: Render Size: 3440x1440
+M: 463.44 ms: Using Fetch Mode
+M: 528.11 ms: Device: NVIDIA GeForce RTX 5080
+M: 528.28 ms: Vendor: Nvidia
+M: 528.42 ms: DeviceID: 0x2c02
+M: 528.56 ms: Video Memory: 15.60 GB
+M: 528.63 ms: Creating SceneManager
+M: 651.54 ms: Creating RenderManager
+M: 741.40 ms: Rasterization Mode
+M: 741.56 ms: Creating Scene
+M:   1.640 s: Creating 200,000 Asteroids
+M:   1.699 s: Updating Scene
+M:   1.796 s: GravityMark 1.89 Direct3D11 is Ready in 1.8 s
+M:   1.797 s: Starting 3440x1440 Direct3D11 Benchmark
+M:   1.797 s: Close when finished
+M:   1.797 s: Image: C:/tuner/data/shot.png
+M:   1.797 s: Times: C:/tuner/data/times.txt
+M:   1.797 s: Count: 1
+M:   1.801 s: Resizing 3440x1440 frame
+M:  27.476 s: Clearing Scene
+M:  27.582 s: GravityMark 1.89 Done
+M:  27.583 s: Restore fullscreen mode on 0 screen
+V:  27.665 s: Windows::main(): finished

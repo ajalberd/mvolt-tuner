@@ -93,12 +93,14 @@ def run_checks() -> PreflightReport:
     except config.DependencyMissing as exc:
         rep.checks.append(Check("mVolt+", False, "not found", str(exc)))
 
+    # Only the selected benchmark has to be installed.
+    tool = config.bench_tool()
+    name = "GravityMark" if tool == "gravitymark" else "MSI Kombustor"
     try:
-        kd = config.kombustor_dir()
-        exe = config.kombustor_exe()
-        rep.checks.append(Check("MSI Kombustor", True, f"{exe}"))
+        exe = config.gravitymark_exe() if tool == "gravitymark" else config.kombustor_exe()
+        rep.checks.append(Check(name, True, f"{exe}"))
     except config.DependencyMissing as exc:
-        rep.checks.append(Check("MSI Kombustor", False, "not found", str(exc)))
+        rep.checks.append(Check(name, False, "not found", str(exc)))
 
     rep.checks.append(Check(
         "nvidia-smi",
